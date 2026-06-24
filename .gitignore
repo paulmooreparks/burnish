@@ -33,3 +33,6 @@ go.work.sum
 
 # Raw style corpora (kept local; profiles are the committed artifact)
 /corpus/
+
+# Style profiles are user data (stylometric fingerprints); keep them local
+*.profile.yaml

@@ -1,8 +1,11 @@
 # Profiles
 
-Distilled style profiles. The profile YAML (statistics + lexicon) is committed;
-the raw corpus is not (the profile is the reusable artifact). Each profile
-documents its corpus here so it is reproducible.
+A style profile is a stylometric fingerprint of someone's writing: it is **user
+data, not source**, and is **not committed** (this repo is public, and other users
+will distill from genuinely private corpora). Profile YAML files are gitignored;
+they live as local artifacts and are regenerated from a corpus by `distill`. Only
+this manifest is committed, and it documents each profile so it is reproducible.
+The raw corpus is not committed either.
 
 ## The corpus must be authentically human
 
