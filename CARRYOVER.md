@@ -107,13 +107,18 @@ for invariants.
    official go-sdk over stdio; `distill`/`score` fully wired, `style_review`
    returns the deterministic gap report + lexicon/rules payload with judgement
    marked not-yet-available. Run via `burnish mcp`.
-3. **`discriminate/`: calibration** (DESIGN section 2, 5) is now the next code
-   step. Hold out target text + generic-LLM decoys, compute the threshold, emit
-   the scoring rubric. Inference is the **caller's** LLM (the agent), in a fresh
-   isolated context, *not* a baked Haiku call. Wire the rubric + the held-out
-   exemplars into `style_review` (replacing the not-yet-available marker).
-   Orthogonal data task still pending: curate a *real* single-register corpus
-   (the 5-doc smoke set was convenience) and re-distill.
+3. **[done] Real corpus curated** (board card burnish-1). The 5-doc smoke set is
+   replaced by a register-homogeneous 10-doc, ~54.7K-word long-form design/PRD
+   corpus; profile committed at `profiles/paul-longform.profile.yaml` with a
+   reproducible manifest in `profiles/README.md` (raw corpus kept out of git).
+4. **`discriminate/`: calibration** (DESIGN section 2, 5) is the next code step
+   (board card burnish-2, priority now). Hold out target text + generic-LLM
+   decoys, compute the threshold, emit the scoring rubric. Inference is the
+   **caller's** LLM (the agent), in a fresh isolated context, *not* a baked Haiku
+   call. Wire the rubric + held-out exemplars into `style_review`. Open decision
+   to surface at Spec: where the calibration-time judging inference comes from
+   (the agent scores the calibration set, vs. a one-off adapter call) to find the
+   threshold without a baked model in the hot path.
 4. Then, in DESIGN section 9 order: rule mining + `judge/` payload, exemplar
    retrieval (`retrieve/`), full massage loop (`enforce/`), the Claude Code Stop
    hook (push guarantee), and finally the `model/` headless adapter + `serve`.
