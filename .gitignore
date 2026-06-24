@@ -30,3 +30,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Raw style corpora (kept local; profiles are the committed artifact)
+/corpus/
