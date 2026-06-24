@@ -76,6 +76,15 @@ the generating model into a separate, deterministic-plus-adversarial checker.
 9. **Multi-register** profiles over a shared base profile of cross-register
    invariants (the existing CLAUDE.md rules are mostly the base).
 10. First grounding corpus: **Paul's own writing**, long-form register first.
+11. **Any language, not just English** (DESIGN section 11). Core (engine, profile
+    format, lint math, judge protocol, discriminator, massage loop, MCP) is
+    language-neutral; segmentation + feature set + lexicon baseline + readability
+    are a per-language **module** selected by the profile's `language`. The LLM
+    half (judge/discriminator) is multilingual for free; only the deterministic
+    feature layer needs per-language porting. Profiles record `language`;
+    distill/lint **refuse** an unimplemented language rather than mis-measure.
+    Foundation is Unicode-clean (`\p{L}\p{M}`); CJK word segmentation deferred to
+    its module. English module is the only one built.
 
 ## Multi-register reminder
 

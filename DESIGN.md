@@ -324,3 +324,57 @@ asymptotic: the discriminator gives you a distance and you drive it down, but
 expect a plateau where the last increment of "indistinguishable" costs a lot. Frame
 it as "measurably close and improving," not "perfect clone." The discriminator at
 least reports honestly where you are on that curve.
+
+## 11. Multi-language
+
+bluepencil must support any language, not only English. The architecture is built
+so that adding a language touches one replaceable part and nothing else.
+
+**Language-neutral core (unchanged per language):** the engine, the profile
+format, the `lint` scoring math (weighted deviation in stddev units over whatever
+metrics the profile declares), the `judge` protocol, the `discriminate`
+calibration and gate, the `enforce` massage loop, and the MCP surface. None of
+these know or care what language the text is in: they operate on a named metric
+map and a profile, both language-tagged.
+
+**Language module (the one replaceable part):** segmentation (sentence and word
+boundaries), the statistical feature set (which metrics are computed and how),
+the lexicon baseline, and the readability formula. The metric-extraction code in
+`distill/` today *is* the English module. Adding French or Chinese means
+registering a new module; the core above does not change.
+
+Three things make this clean:
+
+1. **Metric ids are a per-language contract, not a fixed list.** Features are an
+   open `map[string]float64`. A language module contributes whatever metrics make
+   sense for it, and `lint` compares same-id metrics between the profile and the
+   draft. A space-delimited language measures words-per-sentence; a Chinese or
+   Japanese module would measure characters-per-sentence and skip the
+   syllable-based readability grade entirely, contributing its own metrics
+   instead. The scoring layer is indifferent.
+
+2. **A profile carries its `language`, and a draft is scored with the module that
+   distilled the profile.** Scoring text with a different module than built the
+   profile yields incomparable numbers, so `distill` and `lint` refuse a language
+   with no module rather than emit or score an English-measured artifact
+   mislabeled as another language. (Today only `en` is registered; an unsupported
+   language is an explicit error, not silent garbage.)
+
+3. **The LLM half generalizes across languages for free.** The `judge` and the
+   `discriminate` steps are rendered by a multilingual LLM (the caller's, per
+   section 7): "does this sound like the corpus?" needs no per-language code. So a
+   new language gets the adversarial discriminator and rule-judging immediately;
+   only the cheap deterministic feature layer waits on its module. This inverts
+   the usual cost: the hard, subjective half is already multilingual; the easy,
+   mechanical half is what needs porting.
+
+**Foundations already laid:** the segmenter uses Unicode letter/mark classes
+(`\p{L}\p{M}`), not `[A-Za-z]`, and recognizes non-Latin sentence terminators, so
+no script is silently dropped at tokenization. Correct *word* segmentation for
+non-spacing scripts (Chinese, Japanese, Thai) is a known gap deferred to those
+modules; the foundation is Unicode-clean, not yet CJK-correct.
+
+**Still English-centric, to revisit per language:** the em-dash invariant and its
+`--` stand-in are a Latin-script, Paul-specific base rule; base profiles will
+themselves be per-language. The function-word fingerprint, hedge/pronoun sets,
+contraction handling, and Flesch-Kincaid are all the English module's content.

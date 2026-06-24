@@ -48,8 +48,13 @@ type LexicalViolation struct {
 
 const epsilon = 1e-9
 
-// Check scores draft text against a profile.
-func Check(draft string, p *stylespec.Profile) Result {
+// Check scores draft text against a profile. It returns an error if no feature
+// module exists for the profile's language, since scoring a draft with a
+// different module than distilled the profile yields incomparable metrics.
+func Check(draft string, p *stylespec.Profile) (Result, error) {
+	if !distill.LanguageImplemented(p.Language) {
+		return Result{}, distill.ErrUnsupportedLanguage(p.Language)
+	}
 	var res Result
 	metrics := distill.Metrics(draft)
 
@@ -92,7 +97,7 @@ func Check(draft string, p *stylespec.Profile) Result {
 
 	res.Lexical = findAvoided(draft, p.Lexicon.Avoided)
 	res.HardViolations += len(res.Lexical)
-	return res
+	return res, nil
 }
 
 // deviation returns how far value lies outside the target range, measured in

@@ -18,6 +18,12 @@ import (
 type Profile struct {
 	ID       string `yaml:"id"`
 	Register string `yaml:"register"`
+	// Language is the BCP-47-ish code (e.g. "en", "fr", "zh") of the corpus and
+	// of the drafts this profile scores. It selects the language module that
+	// segments text and computes features; a draft must be scored with the same
+	// module that distilled the profile, or the metrics are not comparable. See
+	// DESIGN.md section 11.
+	Language string `yaml:"language"`
 	Inherits string `yaml:"inherits,omitempty"`
 
 	Features      []Feature      `yaml:"features"`

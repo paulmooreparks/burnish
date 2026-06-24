@@ -39,8 +39,17 @@ func DefaultOptions() Options {
 	return Options{RangeK: 1.5, LexiconTopN: 40, LexiconMinCount: 3, LexiconMinDocs: 2}
 }
 
-// Distill builds a Profile from a single-register corpus.
-func Distill(id, register string, docs []DocInput, opts Options) *stylespec.Profile {
+// Distill builds a Profile from a single-register corpus in the given language.
+// An empty language defaults to DefaultLanguage. It returns an error if no
+// feature module exists for the language, rather than emitting a profile whose
+// features were computed by the wrong (English) module.
+func Distill(id, register, language string, docs []DocInput, opts Options) (*stylespec.Profile, error) {
+	if language == "" {
+		language = DefaultLanguage
+	}
+	if !LanguageImplemented(language) {
+		return nil, ErrUnsupportedLanguage(language)
+	}
 	if opts.RangeK == 0 {
 		opts = DefaultOptions()
 	}
@@ -61,6 +70,7 @@ func Distill(id, register string, docs []DocInput, opts Options) *stylespec.Prof
 	prof := &stylespec.Profile{
 		ID:       id,
 		Register: register,
+		Language: language,
 		Corpus:   stylespec.CorpusStats{Documents: len(docs), Words: totalWords},
 	}
 
@@ -93,7 +103,7 @@ func Distill(id, register string, docs []DocInput, opts Options) *stylespec.Prof
 	}
 	prof.Lexicon.Avoided = []string{"—", "--"}
 
-	return prof
+	return prof, nil
 }
 
 // weightFor assigns a feature weight. Stable features (low coefficient of

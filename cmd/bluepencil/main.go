@@ -65,6 +65,7 @@ func cmdDistill(args []string) error {
 	register := fs.String("register", "", "register name (e.g. long-form-design-doc)")
 	id := fs.String("id", "", "profile id (defaults to register)")
 	out := fs.String("out", "", "output profile path (defaults to <id>.profile.yaml)")
+	language := fs.String("language", distill.DefaultLanguage, "corpus language code (only 'en' implemented)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -87,7 +88,10 @@ func cmdDistill(args []string) error {
 		return fmt.Errorf("no .md or .txt documents under %s", corpusV)
 	}
 
-	prof := distill.Distill(idV, registerV, docs, distill.DefaultOptions())
+	prof, err := distill.Distill(idV, registerV, *language, docs, distill.DefaultOptions())
+	if err != nil {
+		return err
+	}
 	if err := prof.Save(outV); err != nil {
 		return err
 	}
@@ -129,7 +133,10 @@ func cmdScore(args []string) error {
 		}
 	}
 
-	res := lint.Check(string(draft), prof)
+	res, err := lint.Check(string(draft), prof)
+	if err != nil {
+		return err
+	}
 
 	if *jsonOut {
 		enc := json.NewEncoder(os.Stdout)

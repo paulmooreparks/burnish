@@ -36,13 +36,22 @@ type Sentence struct {
 }
 
 var (
-	// wordRe matches word tokens, allowing internal apostrophes for
-	// contractions ("don't", "we're") and possessives.
-	wordRe = regexp.MustCompile(`[A-Za-z]+(?:'[A-Za-z]+)*`)
-	// sentenceSplitRe splits on terminal punctuation followed by whitespace
-	// or end of string. It is deliberately simple; abbreviation handling is
-	// out of scope because aggregate rates tolerate the noise.
-	sentenceSplitRe = regexp.MustCompile(`[.!?]+(?:\s+|$)`)
+	// wordRe matches word tokens using Unicode letter (\p{L}) and combining-mark
+	// (\p{M}) classes, so accented Latin and non-Latin scripts are not silently
+	// dropped, allowing internal apostrophes (straight or curly) for contractions
+	// and possessives. Note: this still splits on whitespace, so for scripts that
+	// do not delimit words with spaces (Chinese, Japanese, Thai) a run of
+	// characters is captured as one token. Correct word segmentation there is a
+	// per-language-module concern (DESIGN.md section 11); this regex only ensures
+	// the foundation is Unicode-clean, not that every language is handled.
+	wordRe = regexp.MustCompile(`[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*`)
+	// sentenceSplitRe splits on terminal punctuation. ASCII terminators must be
+	// followed by whitespace or end of string (so "3.14" and "U.S." do not split);
+	// fullwidth/CJK and other-script terminators split unconditionally because
+	// they are not generally followed by a space. Deliberately simple; abbreviation
+	// handling is out of scope because aggregate rates tolerate the noise, and
+	// finer per-language rules belong in the language module.
+	sentenceSplitRe = regexp.MustCompile(`[.!?]+(?:\s+|$)|[。！？؟।]+`)
 )
 
 // Segment parses raw text into a Doc.

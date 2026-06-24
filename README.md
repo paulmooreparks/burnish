@@ -140,3 +140,14 @@ bluepencil score --profile p.yaml --json < draft.md
   read as distinctive.
 - It measures and gates; it does not yet rewrite. Rewriting arrives with the
   massage loop (`enforce/`), which depends on the LLM judge and discriminator.
+
+## Languages
+
+The design is language-agnostic: segmentation, the feature set, and the lexicon
+baseline are a per-language module selected by a profile's `language` field. The
+core engine, profile format, scoring, and the LLM judge/discriminator are
+language-neutral, and the LLM half works across languages with no extra code.
+Today only the English (`en`) module is built; `distill --language X` and `score`
+refuse a language with no module rather than mis-measure it. The text foundation
+is Unicode-clean; correct word segmentation for non-spacing scripts (Chinese,
+Japanese, Thai) awaits those modules. See DESIGN.md section 11.
