@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/paulmooreparks/bluepencil/internal/text"
+	"github.com/paulmooreparks/burnish/internal/text"
 )
 
 //go:embed data/baseline_en.txt

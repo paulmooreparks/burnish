@@ -1,6 +1,6 @@
 // Package text provides deterministic, dependency-free segmentation of prose
 // into paragraphs, sentences, words, and syllables. It is the shared substrate
-// for every stylometric measurement in bluepencil: feature extraction and
+// for every stylometric measurement in burnish: feature extraction and
 // linting both segment identically, so a profile distilled from a corpus is
 // directly comparable to a draft scored against it.
 //

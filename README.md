@@ -1,4 +1,4 @@
-# bluepencil
+# burnish
 
 A tool for auto-editing LLM output into a target text style.
 
@@ -18,7 +18,7 @@ ships today measures distance-to-style and hard-fails on banned constructs; it
 does not yet rewrite drafts.
 
 The **MCP server** (the primary agentic path) exposes `distill`, `score`, and a
-`style_review` tool, and owns no model. bluepencil provides deterministic
+`style_review` tool, and owns no model. burnish provides deterministic
 measurement, calibration, and the scoring protocol; the *calling agent* (already
 an LLM) renders the judgement and revision, in a fresh isolated context. A
 built-in model adapter exists only as a headless fallback for agent-less callers.
@@ -30,11 +30,10 @@ returns the deterministic gap report with judgement marked not-yet-available.
 ## Build
 
 ```
-go build ./cmd/bluepencil
+go build ./cmd/burnish
 ```
 
-Requires Go 1.24+. The binary is self-contained (the only dependency is a YAML
-library, compiled in).
+Requires Go 1.25+ (the MCP SDK sets the floor). The binary is self-contained.
 
 ## Concepts
 
@@ -55,7 +54,7 @@ means every measured feature sits inside the corpus's range. **Hard violations**
 ### 1. Distill a profile from a corpus
 
 ```
-bluepencil distill --corpus DIR --register NAME [--id ID] [--out FILE]
+burnish distill --corpus DIR --register NAME [--id ID] [--out FILE]
 ```
 
 `--corpus` is a directory; every `.md` and `.txt` under it (recursively) becomes
@@ -63,7 +62,7 @@ one corpus document. `--register` names the genre. `--id` defaults to the
 register; `--out` defaults to `<id>.profile.yaml`.
 
 ```
-bluepencil distill \
+burnish distill \
   --corpus ./corpus/longform \
   --register long-form-design-doc \
   --id paul-longform \
@@ -83,13 +82,13 @@ those with low corpus variance, are weighted higher).
 ### 2. Score a draft against the profile
 
 ```
-bluepencil score --profile FILE [DRAFT]
+burnish score --profile FILE [DRAFT]
 ```
 
 Reads the draft from the file argument, or from stdin if omitted.
 
 ```
-bluepencil score --profile paul-longform.profile.yaml draft.md
+burnish score --profile paul-longform.profile.yaml draft.md
 ```
 
 ```
@@ -111,20 +110,20 @@ avoided terms present:
 Exit code is non-zero when there are hard violations, so it composes in scripts:
 
 ```
-bluepencil score --profile p.yaml draft.md || echo "off-style, blocked"
+burnish score --profile p.yaml draft.md || echo "off-style, blocked"
 ```
 
 Add `--json` for machine-readable output (the same result as a JSON object with
 `distance`, `features`, `lexical`, and `hard_violations` fields):
 
 ```
-bluepencil score --profile p.yaml --json < draft.md
+burnish score --profile p.yaml --json < draft.md
 ```
 
 ### 3. Use it agentically over MCP
 
 ```
-bluepencil mcp
+burnish mcp
 ```
 
 Runs an MCP server on stdio (built on the official Go MCP SDK), exposing three
@@ -144,7 +143,7 @@ tools to any MCP client:
 Register it with Claude Code, e.g.:
 
 ```
-claude mcp add bluepencil -- /path/to/bluepencil mcp
+claude mcp add burnish -- /path/to/burnish mcp
 ```
 
 ## What gets measured

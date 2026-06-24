@@ -4,7 +4,7 @@
 // to Haiku 4.5 in an isolated context with structured output.
 //
 // This is a fallback, not the default path. In the agentic path the caller's own
-// LLM does the cognition and this package is unused; bluepencil owns measurement,
+// LLM does the cognition and this package is unused; burnish owns measurement,
 // calibration, and protocol, never the inference except here (DESIGN.md sections
 // 6, 7, 8 #5).
 //

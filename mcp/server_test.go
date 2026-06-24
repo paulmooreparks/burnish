@@ -10,7 +10,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// connect wires a client to an in-process bluepencil server and returns the
+// connect wires a client to an in-process burnish server and returns the
 // client session.
 func connect(t *testing.T) *sdk.ClientSession {
 	t.Helper()

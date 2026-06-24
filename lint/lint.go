@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/paulmooreparks/bluepencil/distill"
-	"github.com/paulmooreparks/bluepencil/stylespec"
+	"github.com/paulmooreparks/burnish/distill"
+	"github.com/paulmooreparks/burnish/stylespec"
 )
 
 // Result is the deterministic style assessment of a draft.

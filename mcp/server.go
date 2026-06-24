@@ -7,15 +7,15 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/paulmooreparks/bluepencil/distill"
-	"github.com/paulmooreparks/bluepencil/lint"
-	"github.com/paulmooreparks/bluepencil/stylespec"
+	"github.com/paulmooreparks/burnish/distill"
+	"github.com/paulmooreparks/burnish/lint"
+	"github.com/paulmooreparks/burnish/stylespec"
 )
 
 // version is reported to clients in the server implementation info.
 const version = "0.1.0"
 
-// Serve runs the bluepencil MCP server on the stdio transport until the client
+// Serve runs the burnish MCP server on the stdio transport until the client
 // disconnects or ctx is cancelled.
 func Serve(ctx context.Context) error {
 	return NewServer().Run(ctx, &sdk.StdioTransport{})
@@ -24,7 +24,7 @@ func Serve(ctx context.Context) error {
 // NewServer builds the MCP server with the distill, score, and style_review
 // tools registered.
 func NewServer() *sdk.Server {
-	s := sdk.NewServer(&sdk.Implementation{Name: "bluepencil", Version: version}, nil)
+	s := sdk.NewServer(&sdk.Implementation{Name: "burnish", Version: version}, nil)
 
 	sdk.AddTool(s, &sdk.Tool{
 		Name: "distill",

@@ -1,4 +1,4 @@
-# bluepencil: Carryover
+# burnish: Carryover
 
 > Resume context. Read this first, then [DESIGN.md](DESIGN.md).
 > Last updated: 2026-06-24 (walking skeleton built).
@@ -9,14 +9,14 @@ A tool that distills a corpus of writing into a structured **style profile**, th
 massages arbitrary LLM output until it is nearly indistinguishable from that target
 style. Born from a recurring problem: style rules placed in an LLM's memory or
 instructions are quickly forgotten, because in-context instructions only *bias*
-generation and dilute as context grows. bluepencil moves style enforcement *out* of
+generation and dilute as context grows. burnish moves style enforcement *out* of
 the generating model into a separate, deterministic-plus-adversarial checker.
 
 ## Where we are
 
 - **Design: converged.** Full architecture in [DESIGN.md](DESIGN.md).
 - **Code: deterministic engine + MCP server built, committed.** Module
-  `github.com/paulmooreparks/bluepencil`, Go 1.25 (auto-upgraded by the MCP SDK).
+  `github.com/paulmooreparks/burnish`, Go 1.25 (auto-upgraded by the MCP SDK).
   The no-model core of distill -> score -> serve is implemented, vetted, tested:
   - `internal/text/` deterministic Unicode-aware segmenter.
   - `distill/` stylometric feature extractor (~49 metrics incl. function-word
@@ -27,10 +27,10 @@ the generating model into a separate, deterministic-plus-adversarial checker.
     per-feature off-target list + avoided-term spans + hard/soft severity.
   - `mcp/` MCP server (official go-sdk, stdio) exposing `distill`, `score`,
     `style_review`; integration-tested via in-memory transport + real stdio.
-  - `cmd/bluepencil` CLI: `distill`, `score`, `mcp` subcommands.
+  - `cmd/burnish` CLI: `distill`, `score`, `mcp` subcommands.
   - `judge/ retrieve/ discriminate/ enforce/ model/ pkg/api` documented stubs.
 - **Smoke-tested end to end.** Distilled a 5-doc long-form profile (Arch
-  Principles + Overt/Andoneer/bluepencil design docs). Generic-LLM draft scored
+  Principles + Overt/Andoneer/burnish design docs). Generic-LLM draft scored
   5.21 with 3 hard violations (em-dash + 84-sigma hedge rate); Paul-style draft
   scored 1.83 with zero hard violations. The score cleanly separates the two and
   the hard gate fires correctly.
@@ -106,7 +106,7 @@ for invariants.
 2. **[done] `mcp/`: the MCP server** (DESIGN section 9 step 3). Built on the
    official go-sdk over stdio; `distill`/`score` fully wired, `style_review`
    returns the deterministic gap report + lexicon/rules payload with judgement
-   marked not-yet-available. Run via `bluepencil mcp`.
+   marked not-yet-available. Run via `burnish mcp`.
 3. **`discriminate/`: calibration** (DESIGN section 2, 5) is now the next code
    step. Hold out target text + generic-LLM decoys, compute the threshold, emit
    the scoring rubric. Inference is the **caller's** LLM (the agent), in a fresh

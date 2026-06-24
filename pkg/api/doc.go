@@ -1,5 +1,5 @@
 // Package api is the stable, importable entry point for Go applications (Tela,
-// planning.fit) that want to wrap their own LLM calls with bluepencil style
+// planning.fit) that want to wrap their own LLM calls with burnish style
 // enforcement. The intended surface is:
 //
 //	Check(ctx context.Context, text string, profile *stylespec.Profile) (Result, error)

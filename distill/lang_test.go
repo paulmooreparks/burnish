@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/paulmooreparks/bluepencil/internal/text"
+	"github.com/paulmooreparks/burnish/internal/text"
 )
 
 func TestUnicodeWordsNotDropped(t *testing.T) {

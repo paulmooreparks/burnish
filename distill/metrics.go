@@ -4,7 +4,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/paulmooreparks/bluepencil/internal/text"
+	"github.com/paulmooreparks/burnish/internal/text"
 )
 
 // Metric ids. These strings are the stable contract between distill (which

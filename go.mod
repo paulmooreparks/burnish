@@ -1,4 +1,4 @@
-module github.com/paulmooreparks/bluepencil
+module github.com/paulmooreparks/burnish
 
 go 1.25.0
 

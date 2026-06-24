@@ -1,4 +1,4 @@
-# bluepencil: Design
+# burnish: Design
 
 > A tool for auto-editing LLM output into a target text style.
 >
@@ -17,7 +17,7 @@ else competing for attention, and as context grows the bias dilutes. Anything th
 relies on the generating model "remembering" inherits this failure mode. Few-shot
 examples help but are still soft.
 
-bluepencil's job is bigger than a banned-token linter. The goal: **point the tool
+burnish's job is bigger than a banned-token linter. The goal: **point the tool
 at a repository of work (a blog, a knowledge base, a collection of customer-facing
 documents) and have it distill that corpus into a style, then massage arbitrary LLM
 output until it is nearly indistinguishable from the target style.**
@@ -170,7 +170,7 @@ that exposes an MCP server (the primary agentic surface), runs as a Claude Code
 Stop hook with zero runtime deps, is importable as a package for Go apps (Tela,
 planning.fit), and runs as a `serve` HTTP sidecar for .NET surfaces (GK Expense).
 
-**Division of labor: bluepencil owns measurement, calibration, and protocol,
+**Division of labor: burnish owns measurement, calibration, and protocol,
 never the inference, except as a fallback adapter.** The deterministic checks
 (features, lexicon) need no model at all. The judgement steps (subjective rules,
 the discriminator) need an LLM, but that LLM is *the caller's* in the agentic
@@ -191,7 +191,7 @@ discriminate/  calibration (held-out + decoys + threshold) + scoring rubric/prot
 enforce/       the massage loop: lint -> judge -> retrieve -> discriminate -> revise|fail
 model/         optional inference adapter for headless callers (configurable; Haiku default)
 mcp/           MCP server: distill, score, style_review tools         (agents call this)
-cmd/bluepencil stdin text -> exit code + JSON violations / score      (hooks exec this)
+cmd/burnish stdin text -> exit code + JSON violations / score      (hooks exec this)
 pkg/api        Check(ctx, text, profile) (Result, error)             (apps import this)
 ```
 
@@ -221,7 +221,7 @@ the load:
   cannot forget, and the result re-injects violations as a hard structured signal
   at check time, not as a soft prior buried in instructions.
 - **Claude Code Stop hook** (the enforcement guarantee, complementary to MCP):
-  execs `bluepencil` against the last assistant turn. Non-zero exit + the JSON
+  execs `burnish` against the last assistant turn. Non-zero exit + the JSON
   violation list on stderr blocks the turn and feeds violations back, forcing a
   self-revise. MCP is *pull* (the agent must choose to call it, and may forget,
   which reintroduces the forgetting problem one level up at orchestration); the
@@ -297,13 +297,13 @@ deterministic skeleton comes first.
 1. **[done]** `distill/` feature extractor + distinctiveness miner over the
    design-doc corpus -> a `features` + `lexicon` profile; `internal/text/`
    segmenter; `stylespec/` profile + YAML.
-2. **[done]** `cmd/bluepencil score`: feed any text, get a distance-to-style
+2. **[done]** `cmd/burnish score`: feed any text, get a distance-to-style
    number + which features are off, with a hard-violation exit gate.
 3. **[done]** **`mcp/` server** (stdio, official go-sdk) exposing `distill`,
    `score`, and a first `style_review` that returns the deterministic gap report
    plus the profile's lexicon/rules as a revision payload, with judgement marked
    not-yet-available. The agentic surface; needs no model. Run via
-   `bluepencil mcp`.
+   `burnish mcp`.
 4. `discriminate/` **calibration**: hold out target doc text vs. generic-LLM
    decoys, compute the threshold, and emit the scoring rubric. Inference is the
    caller's (or the `model/` adapter for headless); the engine owns the protocol.
@@ -328,7 +328,7 @@ least reports honestly where you are on that curve.
 
 ## 11. Multi-language
 
-bluepencil must support any language, not only English. The architecture is built
+burnish must support any language, not only English. The architecture is built
 so that adding a language touches one replaceable part and nothing else.
 
 **Language-neutral core (unchanged per language):** the engine, the profile

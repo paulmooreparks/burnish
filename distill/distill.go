@@ -1,5 +1,5 @@
 // Package distill turns a genre-homogeneous corpus into a style Profile: the
-// offline half of bluepencil (DESIGN.md section 5). It computes a stylometric
+// offline half of burnish (DESIGN.md section 5). It computes a stylometric
 // feature signature with per-feature acceptance ranges and mines a
 // distinctiveness lexicon. Rule mining, exemplar embedding, and discriminator
 // calibration are later increments; this is the "measurement before
@@ -16,8 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/paulmooreparks/bluepencil/internal/text"
-	"github.com/paulmooreparks/bluepencil/stylespec"
+	"github.com/paulmooreparks/burnish/internal/text"
+	"github.com/paulmooreparks/burnish/stylespec"
 )
 
 // DocInput is one corpus document.

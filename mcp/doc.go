@@ -1,4 +1,4 @@
-// Package mcp is the primary agentic surface: an MCP server over the bluepencil
+// Package mcp is the primary agentic surface: an MCP server over the burnish
 // engine. Planned tools:
 //
 //	distill        corpus -> style profile
@@ -11,7 +11,7 @@
 // discriminator step (DESIGN.md sections 6, 7). A tool result is enforcement
 // outside generation: deterministic checks cannot forget, and the result
 // re-injects violations as a hard structured signal at check time rather than a
-// soft prior. MCP is pull; the Stop hook (cmd/bluepencil) is the complementary
+// soft prior. MCP is pull; the Stop hook (cmd/burnish) is the complementary
 // push guarantee.
 //
 // Current state: distill and score are fully wired (deterministic, no model).

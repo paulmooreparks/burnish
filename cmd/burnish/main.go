@@ -1,4 +1,4 @@
-// Command bluepencil is the CLI front end over the bluepencil engine. It exposes:
+// Command burnish is the CLI front end over the burnish engine. It exposes:
 //
 //	distill  build a style profile from a single-register corpus
 //	score    measure a draft's distance from a profile's target style
@@ -16,10 +16,10 @@ import (
 	"io"
 	"os"
 
-	"github.com/paulmooreparks/bluepencil/distill"
-	"github.com/paulmooreparks/bluepencil/lint"
-	bpmcp "github.com/paulmooreparks/bluepencil/mcp"
-	"github.com/paulmooreparks/bluepencil/stylespec"
+	"github.com/paulmooreparks/burnish/distill"
+	"github.com/paulmooreparks/burnish/lint"
+	bpmcp "github.com/paulmooreparks/burnish/mcp"
+	"github.com/paulmooreparks/burnish/stylespec"
 )
 
 func main() {
@@ -39,23 +39,23 @@ func main() {
 		usage()
 		return
 	default:
-		fmt.Fprintf(os.Stderr, "bluepencil: unknown subcommand %q\n\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "burnish: unknown subcommand %q\n\n", os.Args[1])
 		usage()
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "bluepencil: %v\n", err)
+		fmt.Fprintf(os.Stderr, "burnish: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `bluepencil - distill a writing style and measure drafts against it
+	fmt.Fprint(os.Stderr, `burnish - distill a writing style and measure drafts against it
 
 usage:
-  bluepencil distill --corpus DIR --register NAME [--language en] [--id ID] [--out FILE]
-  bluepencil score   --profile FILE [FILE]
-  bluepencil mcp
+  burnish distill --corpus DIR --register NAME [--language en] [--id ID] [--out FILE]
+  burnish score   --profile FILE [FILE]
+  burnish mcp
 
   score reads the draft from FILE or, if omitted, from stdin.
   Add --json to score for machine-readable output.
