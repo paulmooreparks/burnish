@@ -15,18 +15,20 @@ the generating model into a separate, deterministic-plus-adversarial checker.
 ## Where we are
 
 - **Design: converged.** Full architecture in [DESIGN.md](DESIGN.md).
-- **Code: walking skeleton built (increment 1), not yet committed.** Module
-  `github.com/paulmooreparks/bluepencil`, Go 1.24. The pure-Go, no-API-key core
-  of the distill->score path is implemented, vetted, and tested green:
-  - `internal/text/` deterministic segmenter (paragraphs/sentences/words/syllables).
+- **Code: deterministic engine + MCP server built, committed.** Module
+  `github.com/paulmooreparks/bluepencil`, Go 1.25 (auto-upgraded by the MCP SDK).
+  The no-model core of distill -> score -> serve is implemented, vetted, tested:
+  - `internal/text/` deterministic Unicode-aware segmenter.
   - `distill/` stylometric feature extractor (~49 metrics incl. function-word
-    fingerprint) + Zipf-baseline distinctiveness lexicon miner + corpus->Profile.
-  - `stylespec/` Profile types + YAML load/save (matches DESIGN section 3 schema).
+    fingerprint) + Zipf-baseline distinctiveness lexicon miner + corpus->Profile;
+    per-language registry guard (`lang.go`).
+  - `stylespec/` Profile types (+ `language` field) + YAML load/save.
   - `lint/` deterministic scorer: weighted distance-to-style (in stddev units) +
     per-feature off-target list + avoided-term spans + hard/soft severity.
-  - `cmd/bluepencil` CLI: `distill` and `score` subcommands.
-  - `judge/ retrieve/ discriminate/ enforce/ pkg/api` exist as documented stubs
-    (package doc.go each) so the layout matches DESIGN section 6.
+  - `mcp/` MCP server (official go-sdk, stdio) exposing `distill`, `score`,
+    `style_review`; integration-tested via in-memory transport + real stdio.
+  - `cmd/bluepencil` CLI: `distill`, `score`, `mcp` subcommands.
+  - `judge/ retrieve/ discriminate/ enforce/ model/ pkg/api` documented stubs.
 - **Smoke-tested end to end.** Distilled a 5-doc long-form profile (Arch
   Principles + Overt/Andoneer/bluepencil design docs). Generic-LLM draft scored
   5.21 with 3 hard violations (em-dash + 84-sigma hedge rate); Paul-style draft
@@ -101,15 +103,17 @@ for invariants.
    Overt DESIGN/CARRYOVER, Andoneer PRD, GK Expense PRD, planning.fit design
    docs), confirm register-homogeneity, and re-distill. Thin corpora yield
    low-confidence ranges (distill warns under 5 docs).
-2. **`mcp/`: the MCP server** (DESIGN section 9 step 3). This is now the next
-   surface, ahead of the discriminator. It needs **no model**: expose `distill`
-   and `score` (both built), plus a first `style_review` that returns the
-   deterministic gap report. Ships the value we already have to any MCP client
-   immediately, and is the agentic path.
-3. **`discriminate/`: calibration** (DESIGN section 2, 5). Hold out target text +
-   generic-LLM decoys, compute the threshold, emit the scoring rubric. Inference
-   is the **caller's** LLM (the agent), in a fresh isolated context, *not* a baked
-   Haiku call. Wire the rubric into `style_review`.
+2. **[done] `mcp/`: the MCP server** (DESIGN section 9 step 3). Built on the
+   official go-sdk over stdio; `distill`/`score` fully wired, `style_review`
+   returns the deterministic gap report + lexicon/rules payload with judgement
+   marked not-yet-available. Run via `bluepencil mcp`.
+3. **`discriminate/`: calibration** (DESIGN section 2, 5) is now the next code
+   step. Hold out target text + generic-LLM decoys, compute the threshold, emit
+   the scoring rubric. Inference is the **caller's** LLM (the agent), in a fresh
+   isolated context, *not* a baked Haiku call. Wire the rubric + the held-out
+   exemplars into `style_review` (replacing the not-yet-available marker).
+   Orthogonal data task still pending: curate a *real* single-register corpus
+   (the 5-doc smoke set was convenience) and re-distill.
 4. Then, in DESIGN section 9 order: rule mining + `judge/` payload, exemplar
    retrieval (`retrieve/`), full massage loop (`enforce/`), the Claude Code Stop
    hook (push guarantee), and finally the `model/` headless adapter + `serve`.

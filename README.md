@@ -12,19 +12,20 @@ for current status.
 
 ## Status
 
-Walking skeleton (increment 1). The pure-Go, no-API-key half is built: distill a
-profile, score a draft. What ships today measures distance-to-style and
-hard-fails on banned constructs; it does not yet rewrite drafts.
+Walking skeleton plus the MCP server. The deterministic, no-model engine is
+built: distill a profile, score a draft, and serve all of it over MCP. What
+ships today measures distance-to-style and hard-fails on banned constructs; it
+does not yet rewrite drafts.
 
-The next surface is an **MCP server** (the primary agentic path): it exposes
-`distill`, `score`, and a `style_review` tool, and owns no model. bluepencil
-provides deterministic measurement, calibration, and the scoring protocol; the
-*calling agent* (already an LLM) renders the judgement and revision, in a fresh
-isolated context. A built-in model adapter exists only as a headless fallback
-for agent-less callers. The rule judge, exemplar retrieval, calibrated
-discriminator, massage loop, MCP server, and Claude Code hook are not built yet
-(`judge/`, `retrieve/`, `discriminate/`, `enforce/`, `mcp/`, `model/`, `pkg/api`
-are documented stubs).
+The **MCP server** (the primary agentic path) exposes `distill`, `score`, and a
+`style_review` tool, and owns no model. bluepencil provides deterministic
+measurement, calibration, and the scoring protocol; the *calling agent* (already
+an LLM) renders the judgement and revision, in a fresh isolated context. A
+built-in model adapter exists only as a headless fallback for agent-less callers.
+The rule judge, exemplar retrieval, calibrated discriminator, massage loop, and
+Claude Code hook are not built yet (`judge/`, `retrieve/`, `discriminate/`,
+`enforce/`, `model/`, `pkg/api` are documented stubs); `style_review` therefore
+returns the deterministic gap report with judgement marked not-yet-available.
 
 ## Build
 
@@ -118,6 +119,32 @@ Add `--json` for machine-readable output (the same result as a JSON object with
 
 ```
 bluepencil score --profile p.yaml --json < draft.md
+```
+
+### 3. Use it agentically over MCP
+
+```
+bluepencil mcp
+```
+
+Runs an MCP server on stdio (built on the official Go MCP SDK), exposing three
+tools to any MCP client:
+
+- `distill` (`corpus_dir`, `register`, optional `language`/`id`/`out`) writes a
+  profile and returns a summary.
+- `score` (`profile_path`, `text`) returns the distance, off-target features, and
+  hard-violation count as structured output.
+- `style_review` (`profile_path`, `text`) returns the gap report plus the
+  profile's preferred/avoided lexicon and rules as a revision payload. The
+  judgement itself is left to the calling agent, which should render it in a
+  fresh, isolated context (not the one that wrote the draft). The rule judge and
+  calibrated discriminator are not built yet, so the payload marks judgement as
+  not-yet-available.
+
+Register it with Claude Code, e.g.:
+
+```
+claude mcp add bluepencil -- /path/to/bluepencil mcp
 ```
 
 ## What gets measured

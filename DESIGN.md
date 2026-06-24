@@ -299,10 +299,11 @@ deterministic skeleton comes first.
    segmenter; `stylespec/` profile + YAML.
 2. **[done]** `cmd/bluepencil score`: feed any text, get a distance-to-style
    number + which features are off, with a hard-violation exit gate.
-3. **`mcp/` server** exposing `distill`, `score`, and a first `style_review` that
-   returns the deterministic gap report (no judgement yet). This is the agentic
-   surface and needs no model; it ships the value we already have to any MCP
-   client immediately.
+3. **[done]** **`mcp/` server** (stdio, official go-sdk) exposing `distill`,
+   `score`, and a first `style_review` that returns the deterministic gap report
+   plus the profile's lexicon/rules as a revision payload, with judgement marked
+   not-yet-available. The agentic surface; needs no model. Run via
+   `bluepencil mcp`.
 4. `discriminate/` **calibration**: hold out target doc text vs. generic-LLM
    decoys, compute the threshold, and emit the scoring rubric. Inference is the
    caller's (or the `model/` adapter for headless); the engine owns the protocol.

@@ -1,24 +1,24 @@
-// Command bluepencil is the CLI front end over the bluepencil engine. In this
-// walking-skeleton increment it exposes two subcommands:
+// Command bluepencil is the CLI front end over the bluepencil engine. It exposes:
 //
 //	distill  build a style profile from a single-register corpus
 //	score    measure a draft's distance from a profile's target style
+//	mcp       run the MCP server (stdio) exposing distill/score/style_review
 //
 // The judge, retrieval, discriminator, and full massage loop (and the Claude
 // Code Stop hook that execs this binary) are later increments. See DESIGN.md.
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/paulmooreparks/bluepencil/distill"
 	"github.com/paulmooreparks/bluepencil/lint"
+	bpmcp "github.com/paulmooreparks/bluepencil/mcp"
 	"github.com/paulmooreparks/bluepencil/stylespec"
 )
 
@@ -33,6 +33,8 @@ func main() {
 		err = cmdDistill(os.Args[2:])
 	case "score":
 		err = cmdScore(os.Args[2:])
+	case "mcp":
+		err = bpmcp.Serve(context.Background())
 	case "-h", "--help", "help":
 		usage()
 		return
@@ -51,11 +53,13 @@ func usage() {
 	fmt.Fprint(os.Stderr, `bluepencil - distill a writing style and measure drafts against it
 
 usage:
-  bluepencil distill --corpus DIR --register NAME [--id ID] [--out FILE]
+  bluepencil distill --corpus DIR --register NAME [--language en] [--id ID] [--out FILE]
   bluepencil score   --profile FILE [FILE]
+  bluepencil mcp
 
   score reads the draft from FILE or, if omitted, from stdin.
   Add --json to score for machine-readable output.
+  mcp runs the MCP server over stdio (distill, score, style_review tools).
 `)
 }
 
@@ -80,7 +84,7 @@ func cmdDistill(args []string) error {
 		outV = idV + ".profile.yaml"
 	}
 
-	docs, err := readCorpus(corpusV)
+	docs, err := distill.ReadCorpusDir(corpusV)
 	if err != nil {
 		return err
 	}
@@ -185,25 +189,3 @@ func rangeStr(min, max *float64) string {
 	return "[" + lo + ", " + hi + "]"
 }
 
-func readCorpus(dir string) ([]distill.DocInput, error) {
-	var docs []distill.DocInput
-	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		ext := strings.ToLower(filepath.Ext(path))
-		if ext != ".md" && ext != ".txt" {
-			return nil
-		}
-		b, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		docs = append(docs, distill.DocInput{Name: path, Text: string(b)})
-		return nil
-	})
-	return docs, err
-}

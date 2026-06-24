@@ -12,6 +12,9 @@ package distill
 
 import (
 	"math"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/paulmooreparks/bluepencil/internal/text"
 	"github.com/paulmooreparks/bluepencil/stylespec"
@@ -21,6 +24,31 @@ import (
 type DocInput struct {
 	Name string
 	Text string
+}
+
+// ReadCorpusDir reads every .md and .txt file under dir (recursively) as one
+// corpus document each. Shared by the CLI and the MCP server.
+func ReadCorpusDir(dir string) ([]DocInput, error) {
+	var docs []DocInput
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext != ".md" && ext != ".txt" {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		docs = append(docs, DocInput{Name: path, Text: string(b)})
+		return nil
+	})
+	return docs, err
 }
 
 // Options tunes distillation.

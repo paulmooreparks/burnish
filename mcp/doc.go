@@ -14,7 +14,10 @@
 // soft prior. MCP is pull; the Stop hook (cmd/bluepencil) is the complementary
 // push guarantee.
 //
-// Not yet implemented. This is the next surface to build (DESIGN.md section 9
-// step 3): it can ship the deterministic distill/score value immediately, with
-// style_review's judgement payload filled in as judge/ and discriminate/ land.
+// Current state: distill and score are fully wired (deterministic, no model).
+// style_review returns the deterministic gap report plus the profile's lexicon
+// and rules as a revision payload; the judgement itself (rule judge and
+// calibrated discriminator) is deferred to judge/ and discriminate/, so the
+// payload marks judgement as not-yet-available and instructs the caller to judge
+// in a fresh, isolated context.
 package mcp
