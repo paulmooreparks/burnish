@@ -64,20 +64,23 @@ func usage() {
 	fmt.Fprint(os.Stderr, `burnish - distill a writing style and measure drafts against it
 
 usage:
-  burnish distill   --corpus DIR --register NAME [--language en] [--id ID] [--out FILE]
+  burnish distill   --corpus DIR --register NAME [--language en] [--id ID] [--out FILE] [--avoid "—,--"] [--base FILE]
   burnish score     --profile FILE [FILE]
-  burnish calibrate --target DIR --decoys DIR --register NAME [--id ID] [--out FILE] [--holdout-every N]
+  burnish calibrate --target DIR --decoys DIR --register NAME [--id ID] [--out FILE] [--holdout-every N] [--avoid "—,--"] [--base FILE]
   burnish retrieve  --corpus DIR --query TEXT [-k N] [--min-words N]
-  burnish hook      [--profile FILE]
+  burnish hook      [--avoid "—,--"] [--profile FILE]
   burnish mcp
 
+  --avoid lists terms this author avoids (hard violations); burnish imposes no
+  universal avoidance. --base inherits a shared base profile (cross-register
+  invariants) from a file.
   calibrate builds a profile from the target corpus and derives a discriminator
   threshold separating held-out target text from the decoy (off-style) corpus.
   retrieve returns the corpus passages most relevant to a query, as target-style
   few-shot exemplars.
   hook is the Claude Code Stop hook: reads the stop payload on stdin and blocks
-  the turn on hard style violations (defaults to the base em-dash invariant;
-  --profile or $BURNISH_PROFILE adds a register's hard rules).
+  the turn on hard violations of what YOU configure (--avoid / --profile /
+  $BURNISH_AVOID / $BURNISH_PROFILE). With nothing configured it enforces nothing.
   score reads the draft from FILE or, if omitted, from stdin.
   Add --json to score for machine-readable output.
   mcp runs the MCP server over stdio (distill, score, style_review tools).
@@ -91,6 +94,8 @@ func cmdDistill(args []string) error {
 	id := fs.String("id", "", "profile id (defaults to register)")
 	out := fs.String("out", "", "output profile path (defaults to <id>.profile.yaml)")
 	language := fs.String("language", distill.DefaultLanguage, "corpus language code (only 'en' implemented)")
+	avoid := fs.String("avoid", "", "comma-separated terms this author avoids (hard violations), e.g. \"—,--\"")
+	base := fs.String("base", "", "path to a base profile to inherit (shared cross-register invariants)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -113,13 +118,16 @@ func cmdDistill(args []string) error {
 		return fmt.Errorf("no .md or .txt documents under %s", corpusV)
 	}
 
-	prof, err := distill.Distill(idV, registerV, *language, docs, distill.DefaultOptions())
+	opts := distill.DefaultOptions()
+	opts.Avoid = splitCSV(*avoid)
+	prof, err := distill.Distill(idV, registerV, *language, docs, opts)
 	if err != nil {
 		return err
 	}
 	prof.Rules = judge.Mine(docs, judge.DefaultMinSupport)
 	// Resolve inheritance once, after every field (including rules) is set, so the
-	// saved profile carries the base invariants and matches what Load produces.
+	// saved profile carries the author's base invariants and matches Load.
+	prof.Inherits = *base
 	if prof, err = stylespec.Resolve(prof, ""); err != nil {
 		return err
 	}
@@ -199,6 +207,8 @@ func cmdCalibrate(args []string) error {
 	out := fs.String("out", "", "output profile path (defaults to <id>.profile.yaml)")
 	language := fs.String("language", distill.DefaultLanguage, "language code (only 'en' implemented)")
 	holdout := fs.Int("holdout-every", 4, "hold out every Nth target doc for evaluation")
+	avoid := fs.String("avoid", "", "comma-separated terms this author avoids (hard violations), e.g. \"—,--\"")
+	base := fs.String("base", "", "path to a base profile to inherit (shared cross-register invariants)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -228,11 +238,13 @@ func cmdCalibrate(args []string) error {
 
 	opts := discriminate.DefaultOptions()
 	opts.HoldoutEvery = *holdout
+	opts.Distill.Avoid = splitCSV(*avoid)
 	prof, cal, err := discriminate.Calibrate(idV, *register, *language, targetDocs, decoyDocs, opts)
 	if err != nil {
 		return err
 	}
 	prof.Rules = judge.Mine(targetDocs, judge.DefaultMinSupport)
+	prof.Inherits = *base
 	if prof, err = stylespec.Resolve(prof, ""); err != nil {
 		return err
 	}
@@ -295,6 +307,17 @@ func cmdRetrieve(args []string) error {
 		fmt.Printf("\n%d. [%.3f] %s #%d\n   %s\n", i+1, r.Score, r.Chunk.Source, r.Chunk.Index, oneLine(r.Chunk.Text, 240))
 	}
 	return nil
+}
+
+// splitCSV splits a comma-separated flag value into trimmed, non-empty terms.
+func splitCSV(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func oneLine(s string, n int) string {

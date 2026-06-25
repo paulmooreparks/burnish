@@ -19,11 +19,12 @@ import (
 // is the deterministic guarantee that memory/instruction rules never had: the
 // em-dash rule (and any avoided-lexicon invariant) cannot be forgotten.
 //
-// It checks HARD violations only, against the cross-register base invariants by
-// default (a chat turn is a different register than a distilled profile, so
-// scoring full style distance would be register-mismatched mush). Point it at a
-// register-appropriate profile via --profile / $BURNISH_PROFILE to add that
-// register's hard rules.
+// It checks HARD violations only (a chat turn is a different register than a
+// distilled profile, so scoring full style distance would be register-mismatched
+// mush). burnish imposes NO universal invariants: the hook enforces only what YOU
+// configure. Pass --avoid "—,--" to block specific terms, and/or --profile /
+// $BURNISH_PROFILE for a profile's hard rules. With neither configured, the hook
+// enforces nothing.
 
 type stopPayload struct {
 	TranscriptPath string `json:"transcript_path"`
@@ -40,8 +41,8 @@ type hookOutput struct {
 func cmdHook(args []string) error {
 	// Fail open throughout: a hook error must never break the session.
 	fs := flag.NewFlagSet("hook", flag.ContinueOnError)
-	profile := fs.String("profile", os.Getenv("BURNISH_PROFILE"),
-		"profile YAML (defaults to $BURNISH_PROFILE, else the built-in base invariants)")
+	profile := fs.String("profile", os.Getenv("BURNISH_PROFILE"), "profile YAML whose hard rules to enforce")
+	avoid := fs.String("avoid", os.Getenv("BURNISH_AVOID"), "comma-separated terms to block, e.g. \"—,--\"")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(os.Stderr, "burnish hook: %v (allowing)\n", err)
 		return nil
@@ -52,7 +53,7 @@ func cmdHook(args []string) error {
 		fmt.Fprintf(os.Stderr, "burnish hook: read stdin: %v (allowing)\n", err)
 		return nil
 	}
-	out, err := runHook(payload, *profile)
+	out, err := runHook(payload, *profile, *avoid)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "burnish hook: %v (allowing)\n", err)
 		return nil
@@ -64,8 +65,15 @@ func cmdHook(args []string) error {
 }
 
 // runHook is the IO glue: parse the payload, read the transcript, load the
-// profile, and decide.
-func runHook(payload []byte, profilePath string) (*hookOutput, error) {
+// configured profile/avoid set, and decide.
+func runHook(payload []byte, profilePath, avoidCSV string) (*hookOutput, error) {
+	prof, err := loadHookProfile(profilePath, avoidCSV)
+	if err != nil {
+		return nil, err
+	}
+	if prof == nil {
+		return nil, nil // nothing configured to enforce
+	}
 	var pl stopPayload
 	if len(payload) > 0 {
 		if err := json.Unmarshal(payload, &pl); err != nil {
@@ -85,10 +93,6 @@ func runHook(payload []byte, profilePath string) (*hookOutput, error) {
 	if strings.TrimSpace(text) == "" {
 		return nil, nil
 	}
-	prof, err := loadHookProfile(profilePath)
-	if err != nil {
-		return nil, err
-	}
 	return decideHook(text, prof)
 }
 
@@ -104,13 +108,29 @@ func decideHook(text string, prof *stylespec.Profile) (*hookOutput, error) {
 	return &hookOutput{Decision: "block", Reason: hardViolationReason(res)}, nil
 }
 
-// loadHookProfile returns the named profile, or the built-in base invariants
-// (the em-dash rule) when none is configured, so the hook works with zero setup.
-func loadHookProfile(path string) (*stylespec.Profile, error) {
-	if path == "" {
-		return stylespec.Resolve(&stylespec.Profile{Inherits: stylespec.BaseProfileID}, "")
+// loadHookProfile builds the profile the hook enforces from configuration: an
+// ad-hoc profile from --avoid terms, a --profile file, or both merged. Returns
+// nil when nothing is configured (the hook then enforces nothing). burnish
+// imposes no universal invariants.
+func loadHookProfile(path, avoidCSV string) (*stylespec.Profile, error) {
+	var avoided []string
+	for _, p := range strings.Split(avoidCSV, ",") {
+		if t := strings.TrimSpace(p); t != "" {
+			avoided = append(avoided, t)
+		}
 	}
-	return stylespec.Load(path)
+	if path == "" {
+		if len(avoided) == 0 {
+			return nil, nil
+		}
+		return &stylespec.Profile{Language: "en", Lexicon: stylespec.Lexicon{Avoided: avoided}}, nil
+	}
+	prof, err := stylespec.Load(path)
+	if err != nil {
+		return nil, err
+	}
+	prof.Lexicon.Avoided = append(prof.Lexicon.Avoided, avoided...)
+	return prof, nil
 }
 
 func hardViolationReason(res lint.Result) string {

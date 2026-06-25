@@ -7,13 +7,10 @@ import (
 	"github.com/paulmooreparks/burnish/stylespec"
 )
 
+// emDashProfile is a hook profile configured (as a user would) to avoid em-dashes.
 func baseProfile(t *testing.T) *stylespec.Profile {
 	t.Helper()
-	p, err := stylespec.Resolve(&stylespec.Profile{Inherits: stylespec.BaseProfileID}, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return p
+	return &stylespec.Profile{Language: "en", Lexicon: stylespec.Lexicon{Avoided: []string{"—", "--"}}}
 }
 
 func TestLastAssistantText(t *testing.T) {

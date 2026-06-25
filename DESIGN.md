@@ -124,21 +124,22 @@ matches none. Therefore:
   to `distill/` for a given profile must be genre-homogeneous.
 - The profile carries a `register` field. The massage step selects the profile by
   the kind of output being checked.
-- Cross-register invariants (no em-dash, no "--" stand-in, no surveys,
-  recommendation-first) live in a **base profile** that every register inherits and
-  extends. Paul's existing CLAUDE.md style rules are mostly this base.
+- An author's cross-register invariants (their own no-em-dash rule, say) live in a
+  **base profile** that their register profiles inherit and extend. This is
+  per-author: burnish bakes **no universal invariants**, because it is a tool for
+  anyone's style and must not impose one author's taste (many writers use em-dashes
+  well). Paul's existing CLAUDE.md style rules are *his* base, not everyone's.
 
-**Inheritance is implemented (merge at load time).** A profile's `inherits` field
-names a base (the built-in `base`, or a file path). `stylespec.Resolve` merges it,
-and `Load` resolves so every consumer sees one fully-resolved profile; `distill`
-sets `inherits: base` and the CLI resolves after rules are mined. The base **wins**
-on any conflict, so a register cannot relax an invariant. The decision of *load
-time vs check time* is settled: load time (with `distill` pre-resolving in memory),
-because it keeps every downstream package base-unaware and the merge is idempotent.
-The only invariant today is the no-em-dash rule, now expressed as the base's
-**avoided-lexicon** entry (the hard lexical check enforces it) rather than an inline
-`max: 0` feature; new invariants (e.g. a base judged rule) are added to
-`stylespec.BaseProfile`, never baked into the distiller.
+**Invariants are per-profile, never universal.** Two sources, both opt-in:
+(1) avoided terms set on a profile via `distill --avoid "—,--"` (the author's
+choice; they become the profile's hard avoided-lexicon); (2) a shared base profile
+**file** inherited via `inherits` for cross-register invariants. `stylespec.Resolve`
+merges the base (a file path) at **load time** (with `distill` pre-resolving in
+memory after rules are mined), so every consumer sees one resolved profile and the
+merge is idempotent; the base **wins** on conflict so a register cannot relax an
+invariant the author set. The em-dash rate is otherwise just a normal statistical
+feature (soft distance), not a hard rule, unless the author avoids it. There is no
+built-in opinionated base.
 
 ## 5. The two pipelines
 
@@ -242,6 +243,10 @@ the load:
 - **Go library**: `pkg/api` imported by Tela / planning.fit to wrap their own LLM
   calls.
 - **`serve` mode**: same binary as an HTTP sidecar for .NET surfaces (GK Expense).
+  Its REST API **must be Fielding-style** (HATEOAS, hypermedia-driven, illegal
+  actions absent from the representation), per the cross-project Architectural
+  Principles, wherever practical. Code review of the `serve` API is required to
+  enforce this: a non-hypermedia / RPC-over-HTTP design is a review failure.
 
 ### Two constraints the agentic path must honor
 

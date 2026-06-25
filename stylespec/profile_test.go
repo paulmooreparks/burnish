@@ -54,17 +54,6 @@ func TestMergeBaseWins(t *testing.T) {
 	}
 }
 
-func TestResolveBuiltinBase(t *testing.T) {
-	p := &Profile{ID: "x", Inherits: BaseProfileID}
-	r, err := Resolve(p, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !contains(r.Lexicon.Avoided, "—") || !contains(r.Lexicon.Avoided, "--") {
-		t.Errorf("builtin base avoided not applied: %v", r.Lexicon.Avoided)
-	}
-}
-
 func TestResolveNoInherits(t *testing.T) {
 	p := &Profile{ID: "x"}
 	r, err := Resolve(p, "")
@@ -74,16 +63,27 @@ func TestResolveNoInherits(t *testing.T) {
 }
 
 func TestResolveStable(t *testing.T) {
-	// Re-resolving a resolved profile against the same base yields a deep-equal
-	// profile (stable merge), and Inherits is preserved so Load keeps re-applying.
-	p := &Profile{ID: "x", Inherits: BaseProfileID, Discriminator: &Discriminator{Threshold: 0.3}}
-	r1, _ := Resolve(p, "")
-	r2, _ := Resolve(r1, "")
+	// Re-resolving a resolved profile against the same author base file yields a
+	// deep-equal profile (stable merge); Inherits is preserved so Load re-applies.
+	dir := t.TempDir()
+	base := &Profile{ID: "b", Lexicon: Lexicon{Avoided: []string{"—"}}}
+	if err := base.Save(filepath.Join(dir, "b.profile.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	p := &Profile{ID: "x", Inherits: "b.profile.yaml", Discriminator: &Discriminator{Threshold: 0.3}}
+	r1, err := Resolve(p, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2, _ := Resolve(r1, dir)
 	if !reflect.DeepEqual(r1, r2) {
 		t.Errorf("resolve not stable:\n%+v\n%+v", r1, r2)
 	}
-	if r1.Inherits != BaseProfileID {
+	if r1.Inherits != "b.profile.yaml" {
 		t.Errorf("Inherits not preserved: %q", r1.Inherits)
+	}
+	if !contains(r1.Lexicon.Avoided, "—") {
+		t.Errorf("base avoided not merged: %v", r1.Lexicon.Avoided)
 	}
 }
 

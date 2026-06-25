@@ -61,14 +61,15 @@ type Options struct {
 	LexiconTopN     int
 	LexiconMinCount int
 	LexiconMinDocs  int
-	// Base names the profile the result inherits (cross-register invariants);
-	// "base" is the built-in. Empty disables inheritance. Default "base".
-	Base string
+	// Avoid lists terms this author chooses to avoid (e.g. "—", "--"). They become
+	// the profile's hard avoided-lexicon. Per-profile and opt-in: burnish imposes
+	// no universal avoidance. Empty means nothing is avoided.
+	Avoid []string
 }
 
 // DefaultOptions returns sensible distillation defaults.
 func DefaultOptions() Options {
-	return Options{RangeK: 1.5, LexiconTopN: 40, LexiconMinCount: 3, LexiconMinDocs: 2, Base: stylespec.BaseProfileID}
+	return Options{RangeK: 1.5, LexiconTopN: 40, LexiconMinCount: 3, LexiconMinDocs: 2}
 }
 
 // Distill builds a Profile from a single-register corpus in the given language.
@@ -129,13 +130,22 @@ func Distill(id, register, language string, docs []DocInput, opts Options) (*sty
 		prof.Lexicon.Preferred = append(prof.Lexicon.Preferred, l.Term)
 	}
 
-	// Record the inherited base (cross-register invariants, DESIGN.md section 4).
-	// Distill does NOT resolve it here: rule mining happens after Distill returns
-	// (outside this package, to avoid a distill<->judge import cycle), so the
-	// caller resolves once after attaching rules, via stylespec.Resolve. Resolving
-	// here would be undone by a later prof.Rules assignment.
-	prof.Inherits = opts.Base
+	// Author-chosen avoided terms (opt-in, per-profile). burnish imposes no
+	// universal avoidance; an author who avoids em-dashes passes --avoid.
+	prof.Lexicon.Avoided = dedupAvoid(opts.Avoid)
 	return prof, nil
+}
+
+func dedupAvoid(xs []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, x := range xs {
+		if x != "" && !seen[x] {
+			seen[x] = true
+			out = append(out, x)
+		}
+	}
+	return out
 }
 
 // weightFor assigns a feature weight. Stable features (low coefficient of

@@ -150,28 +150,30 @@ claude mcp add burnish -- /path/to/burnish mcp
 
 `burnish hook` is a Claude Code **Stop hook**: it runs when the assistant finishes
 a turn, checks the last (top-level) assistant message for **hard** style
-violations, and blocks the turn so Claude must revise. This is the deterministic
-guarantee that memory/instruction rules never had: the no-em-dash rule cannot be
-forgotten. It checks hard invariants only (a chat turn is a different register
-than a distilled profile), defaulting to the built-in base (em-dash / `--`), and
-**fails open** on any error so it can never wedge a session.
+violations of what *you* configure, and blocks the turn so Claude must revise.
+This is the deterministic guarantee that memory/instruction rules never had: a
+rule you set cannot be forgotten. It checks hard violations only (a chat turn is a
+different register than a distilled profile) and **fails open** on any error so it
+can never wedge a session.
 
-Add to `~/.claude/settings.json`:
+burnish imposes **no universal rules** (it is a tool for any author's style), so
+the hook enforces only what you configure: `--avoid "—,--"` to block terms,
+and/or `--profile FILE` for a profile's hard rules (or `$BURNISH_AVOID` /
+`$BURNISH_PROFILE`). With nothing configured it enforces nothing. To stop
+em-dashes on every turn, add to `~/.claude/settings.json`:
 
 ```json
 {
   "hooks": {
     "Stop": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "burnish hook" } ] }
+      { "matcher": "", "hooks": [ { "type": "command", "command": "burnish hook --avoid \"—,--\"" } ] }
     ]
   }
 }
 ```
 
-Point it at a register-appropriate profile to add that register's hard rules:
-`burnish hook --profile C:\path\to\paul-chat.profile.yaml` (or set
-`BURNISH_PROFILE`). On a violation it returns `{"decision":"block","reason":...}`
-naming the offending terms; a clean turn produces no output.
+On a violation it returns `{"decision":"block","reason":...}` naming the offending
+terms; a clean turn produces no output.
 
 ## What gets measured
 

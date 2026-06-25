@@ -13,30 +13,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// BaseProfileID is the reserved name a profile's Inherits field uses to inherit
-// the built-in cross-register base (see BaseProfile). Any other non-empty
-// Inherits value is resolved as a file path; this reserved name therefore
-// shadows any base file literally named "base" (with no extension).
-const BaseProfileID = "base"
+// burnish bakes NO universal style invariants: it is a tool for any author's
+// style, so one author's preference (no em-dash, say) must not be imposed on all.
+// Invariants are per-profile. They come from the author's own corpus and choices:
+// avoided terms are set explicitly on a profile (the distiller's --avoid), and a
+// shared cross-register base is an author-provided *file* a profile inherits (see
+// Resolve). There is no built-in opinionated base. See DESIGN.md section 4.
 
-// BaseProfile returns the built-in cross-register base: the invariants every
-// register inherits regardless of what its corpus shows. Today that is the
-// no-em-dash rule, enforced as an avoided-lexicon entry (the hard lexical check).
-// It deliberately carries no statistical features, so it never distorts a
-// register's distance. New cross-register invariants (e.g. a base judged rule)
-// belong here, not baked into the distiller. See DESIGN.md section 4.
-func BaseProfile() *Profile {
-	return &Profile{
-		ID:      BaseProfileID,
-		Lexicon: Lexicon{Avoided: []string{"—", "--"}},
-	}
-}
-
-// Merge overlays base onto child and returns the resolved profile. The base holds
-// cross-register invariants, so on any conflict the base WINS: a register cannot
-// relax an invariant. Features and rules union by id (base entry replaces a
-// same-id child entry); avoided and preferred lexicons union (deduped). The
-// child's identity, register, language, corpus, and discriminator are kept.
+// Merge overlays a user-provided base profile onto child and returns the resolved
+// profile. The base holds the author's cross-register invariants, so on any
+// conflict the base WINS: a register cannot relax an invariant the author set in
+// their base. Features and rules union by id (base entry replaces a same-id child
+// entry); avoided and preferred lexicons union (deduped). The child's identity,
+// register, language, corpus, and discriminator are kept.
 func Merge(base, child *Profile) *Profile {
 	out := *child // shallow copy of scalars; slices/pointers rebuilt below
 
@@ -105,33 +94,27 @@ func dedup(xs []string) []string {
 	return out
 }
 
-// Resolve applies a profile's Inherits: it loads the named base (the built-in
-// BaseProfileID, or a file path relative to dir) and merges it in. The merge is
-// stable, not a literal no-op: Inherits is preserved on the result so Load always
-// re-applies the current base (supporting base updates), and re-resolving the
-// same profile against the same base yields a deep-equal profile (base-wins +
-// dedup are stable). One level deep: a base may not itself inherit. An empty
-// Inherits returns p unchanged.
+// Resolve applies a profile's Inherits: it loads the author-provided base profile
+// (a file path relative to dir) and merges it in. The merge is stable, not a
+// literal no-op: Inherits is preserved on the result so Load always re-applies the
+// current base (supporting base updates), and re-resolving the same profile
+// against the same base yields a deep-equal profile (base-wins + dedup are
+// stable). One level deep: a base may not itself inherit. An empty Inherits
+// returns p unchanged.
 func Resolve(p *Profile, dir string) (*Profile, error) {
 	if p.Inherits == "" {
 		return p, nil
 	}
-	var base *Profile
-	if p.Inherits == BaseProfileID {
-		base = BaseProfile()
-	} else {
-		path := p.Inherits
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(dir, path)
-		}
-		b, err := loadRaw(path)
-		if err != nil {
-			return nil, fmt.Errorf("resolve inherits %q: %w", p.Inherits, err)
-		}
-		if b.Inherits != "" {
-			return nil, fmt.Errorf("resolve inherits %q: base profiles may not themselves inherit", p.Inherits)
-		}
-		base = b
+	path := p.Inherits
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(dir, path)
+	}
+	base, err := loadRaw(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve inherits %q: %w", p.Inherits, err)
+	}
+	if base.Inherits != "" {
+		return nil, fmt.Errorf("resolve inherits %q: base profiles may not themselves inherit", p.Inherits)
 	}
 	return Merge(base, p), nil
 }
