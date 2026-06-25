@@ -73,6 +73,12 @@ burnish distill --corpus DIR --register NAME [--language en] [--id ID] [--out FI
 document. `--avoid` lists terms this author avoids (they become hard violations);
 `--base` inherits a shared base profile file (cross-register invariants).
 
+> **Corpus quality is everything.** `distill` reads files raw and measures whatever
+> it finds, so the profile is only as good as the prose you feed it. Before you
+> distill, read [docs/preparing-a-corpus.md](docs/preparing-a-corpus.md): how to keep
+> the corpus single-author and single-register, and how to extract clean prose from
+> HTML and front-mattered markdown (the failure mode that quietly poisons a profile).
+
 ```
 burnish distill --corpus ./corpus/essays --register personal-essay --id me --avoid "—,--"
 ```
