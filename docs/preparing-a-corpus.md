@@ -1,14 +1,20 @@
 # Preparing a corpus
 
 A burnish profile is only as good as the corpus it is distilled from. `distill`
-measures style with no judgement of its own: feed it clean, single-author,
-single-register prose and it produces a faithful fingerprint; feed it a mix and it
-faithfully fingerprints the mix. This guide is the work you do **before** `distill`.
+measures style with no judgement of its own: feed it clean, single-**register**
+prose authentic to the voice you are targeting and it produces a faithful
+fingerprint; feed it a mix of genres and it faithfully fingerprints the mush. This
+guide is the work you do **before** `distill`.
+
+The "voice you are targeting" can be **one author** or **a whole body of work
+written by many authors** (a house / consensus voice you want new output to blend
+into). Both are first-class; the difference is only what counts as "belongs in this
+corpus." See the README's Use cases section.
 
 > Today this preparation is manual (a script you adapt). It is deliberately a
 > visible, inspectable step, not hidden engine magic, because the two decisions
-> that matter most (is this really the target author? is it one register?) need a
-> human eye. A future `burnish ingest` subcommand will formalize the mechanical
+> that matter most (does this belong to the target voice? is it one register?) need
+> a human eye. A future `burnish ingest` subcommand will formalize the mechanical
 > part (raw files in, clean prose out) without taking those judgements away from
 > you.
 
@@ -17,23 +23,28 @@ faithfully fingerprints the mix. This guide is the work you do **before** `disti
 Both degrade a profile silently. Neither throws an error. Distillation still
 produces a plausible-looking artifact.
 
-### 1. Authorship
+### 1. Authorship (belonging)
 
-The corpus must be writing the target author actually wrote. burnish's
-discriminator exists to tell the target voice apart from everything else, so any
-text that is **not** the author's, AI-generated, a guest post, a quoted passage,
+The corpus must be writing that genuinely **belongs to the target voice**. For a
+single-author profile that means text the author actually wrote; for a house /
+consensus voice it means text that is genuinely part of the body of work you want
+to blend into. Either way, burnish's discriminator exists to tell the target voice
+apart from everything else, so any text that does not belong, AI-generated, a guest
+post or a different author who is not part of the house, a quoted passage,
 boilerplate, sits in the corpus calibrating the profile toward the very voice you
 are trying to move away from.
 
 This is subtle. In practice it has bitten twice on a single corpus: once from
 AI-generated drafts mixed in with hand-written essays, and once from an essay that
 read fine to an automated audit but the author immediately recognized as mostly
-AI-written. **Authorship is the author's call.** Automated classification is a
-first pass, not the authority.
+AI-written. **Belonging is a human call.** Automated classification is a first
+pass, not the authority. (For a many-author house corpus the bar is "is this part
+of our body of work?" rather than "did one specific person write it?", many authors
+is expected; off-house or non-house-authored material is what to exclude.)
 
 ### 2. Register
 
-Even all-authentic, all-one-author text averages into mush if it spans registers.
+Even all-authentic text averages into mush if it spans registers.
 A reflective personal essay, a business plan, a job description, a spoken video
 script, a how-to walkthrough, and a code tutorial are different kinds of writing
 with different sentence shapes, cadences, and vocabularies. Distilling them
@@ -118,8 +129,9 @@ scripts/build-essay-corpus.sh /path/to/your/content   # writes corpus/<name>/ (g
 
 Before distilling, for **each** document:
 
-- [ ] Did the target author write it? (Not AI, not a guest post, not a repost of
-      someone else's work, not a quoted passage.)
+- [ ] Does it belong to the target voice? (For a single-author profile: the author
+      wrote it. For a house voice: it is genuinely part of the body of work. Not AI,
+      not a guest/outside author, not a quoted passage.)
 - [ ] Is it the **one** register this profile targets? (Reflective essay vs how-to
       vs business doc vs spoken script vs code walk-through are different.)
 - [ ] Is it complete enough to measure? (A two-sentence stub or a doc full of empty

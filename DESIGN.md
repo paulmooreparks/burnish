@@ -141,6 +141,46 @@ invariant the author set. The em-dash rate is otherwise just a normal statistica
 feature (soft distance), not a hard rule, unless the author avoids it. There is no
 built-in opinionated base.
 
+### Single-author vs consensus (house) voice
+
+The corpus does not have to be one author. Two modes, both first-class:
+
+- **Single author.** The corpus is one person's writing; the profile captures how
+  *they* write.
+- **Consensus / house voice.** The corpus is a body of work by **many authors** in
+  one register (a documentation set, a knowledge base, a customer-facing corpus).
+  The goal is to make new output read as if written by yet another author who fits
+  the existing body, for example customer-facing documents for a software system
+  being customized for one customer, each blending into the larger set.
+
+This drops out of the same machinery with no special mode. Each feature's target
+range is the corpus mean plus or minus a multiple of the corpus stddev over the
+corpus documents; with many authors the per-feature stddev grows, so the ranges
+widen, and that widening **is** the house envelope: the mean is the
+consensus central tendency, the spread is how much the house legitimately varies. A
+draft is on-target when it lands inside that envelope, so "fit in" is the literal
+acceptance condition. The discriminator (section 2A) is already a membership test
+("did this come from the target corpus?"), which for a body of work means "is this
+plausibly one of ours?". The lexicon and judged rules capture the conventions the
+authors **share** (house terminology, preferred forms, structural habits);
+individual quirks wash out, which is exactly the goal.
+
+Two practical consequences:
+
+- **Many authors is fine; many registers is not.** The single-register rule is the
+  only hard corpus constraint. A documentation set spanning distinct document types
+  (install guide vs API reference vs release notes) is multiple registers: distill
+  each as its own profile sharing a base, do not lump them.
+- **Calibrate with the right decoys.** For a house voice, calibrate (section 5) with
+  target = the body of work and decoys = off-house text (generic-LLM prose, a
+  different product's docs, or a different register). The reported AUC then measures
+  whether the house has a learnable signature at all; a low AUC honestly says the
+  corpus is too heterogeneous to enforce against, rather than manufacturing a
+  crispness that is not there.
+
+Fitting a house voice is generally **more forgiving** than cloning one author
+(section 10): you are matching a region, not a single point.
+
 ## 5. The two pipelines
 
 ### Distill (offline): corpus -> profile
