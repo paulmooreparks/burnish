@@ -2,11 +2,11 @@ package discriminate
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"sort"
 
 	"github.com/paulmooreparks/burnish/distill"
+	"github.com/paulmooreparks/burnish/internal/num"
 	"github.com/paulmooreparks/burnish/lint"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
@@ -137,10 +137,10 @@ func Calibrate(id, register, language string, target, decoys []distill.DocInput,
 	}
 
 	profile.Discriminator = &stylespec.Discriminator{
-		Threshold: round(cal.Threshold, 4),
-		AUC:       round(cal.AUC, 4),
-		TPR:       round(cal.TPR, 4),
-		FPR:       round(cal.FPR, 4),
+		Threshold: num.Round(cal.Threshold, 4),
+		AUC:       num.Round(cal.AUC, 4),
+		TPR:       num.Round(cal.TPR, 4),
+		FPR:       num.Round(cal.FPR, 4),
 		Method:    "distance-threshold",
 	}
 	return profile, cal, nil
@@ -212,9 +212,4 @@ func bestThreshold(positives, negatives []float64) (threshold, tpr, fpr, accurac
 		}
 	}
 	return threshold, tpr, fpr, accuracy
-}
-
-func round(f float64, places int) float64 {
-	p := math.Pow10(places)
-	return math.Round(f*p) / p
 }

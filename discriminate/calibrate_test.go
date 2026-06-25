@@ -50,11 +50,3 @@ func TestBestThresholdOverlap(t *testing.T) {
 	_ = thr
 }
 
-func TestRound(t *testing.T) {
-	if round(0.12345, 4) != 0.1235 {
-		t.Errorf("round(0.12345,4) = %v, want 0.1235", round(0.12345, 4))
-	}
-	if round(1.0, 4) != 1.0 {
-		t.Errorf("round(1.0,4) = %v", round(1.0, 4))
-	}
-}

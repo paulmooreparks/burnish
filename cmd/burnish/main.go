@@ -19,6 +19,7 @@ import (
 
 	"github.com/paulmooreparks/burnish/discriminate"
 	"github.com/paulmooreparks/burnish/distill"
+	"github.com/paulmooreparks/burnish/judge"
 	"github.com/paulmooreparks/burnish/lint"
 	bpmcp "github.com/paulmooreparks/burnish/mcp"
 	"github.com/paulmooreparks/burnish/stylespec"
@@ -103,11 +104,12 @@ func cmdDistill(args []string) error {
 	if err != nil {
 		return err
 	}
+	prof.Rules = judge.Mine(docs, judge.DefaultMinSupport)
 	if err := prof.Save(outV); err != nil {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "distilled %d documents (%d words) -> %s\n", prof.Corpus.Documents, prof.Corpus.Words, outV)
-	fmt.Fprintf(os.Stderr, "  %d features, %d preferred lexicon terms\n", len(prof.Features), len(prof.Lexicon.Preferred))
+	fmt.Fprintf(os.Stderr, "  %d features, %d preferred lexicon terms, %d deterministic rules\n", len(prof.Features), len(prof.Lexicon.Preferred), len(prof.Rules))
 	if prof.Corpus.Documents < 5 {
 		fmt.Fprintf(os.Stderr, "  warning: thin corpus (%d docs); target ranges are low-confidence\n", prof.Corpus.Documents)
 	}
@@ -152,9 +154,18 @@ func cmdScore(args []string) error {
 	if *jsonOut {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		return enc.Encode(res)
+		return enc.Encode(struct {
+			lint.Result
+			RuleViolations []judge.RuleViolation `json:"rule_violations,omitempty"`
+		}{res, judge.CheckRules(string(draft), prof.Rules)})
 	}
 	printResult(prof, res)
+	if rv := judge.CheckRules(string(draft), prof.Rules); len(rv) > 0 {
+		fmt.Println("\nrule violations:")
+		for _, v := range rv {
+			fmt.Printf("  [%s] %s\n      para %d: %s\n", v.Severity, v.Statement, v.Paragraph, v.Evidence)
+		}
+	}
 	if res.HardViolations > 0 {
 		os.Exit(1)
 	}
@@ -203,6 +214,7 @@ func cmdCalibrate(args []string) error {
 	if err != nil {
 		return err
 	}
+	prof.Rules = judge.Mine(targetDocs, judge.DefaultMinSupport)
 	if err := prof.Save(outV); err != nil {
 		return err
 	}

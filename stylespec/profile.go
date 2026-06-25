@@ -62,15 +62,19 @@ type Lexicon struct {
 	Avoided   []string `yaml:"avoided,omitempty"`
 }
 
-// Rule is an LLM-induced, corpus-validated style rule. Support is the fraction
-// of corpus paragraphs in which the rule held at distillation time.
+// Rule is a corpus-validated style rule. Support is the fraction of corpus
+// paragraphs in which the rule held at mining time. Deterministic rules carry a
+// mined Param (e.g. a length ceiling) and are checked mechanically; judged rules
+// carry no Param and are evaluated by the caller's LLM against the Statement.
 type Rule struct {
-	ID              string  `yaml:"id"`
-	Class           string  `yaml:"class"`    // "judged" | "deterministic"
-	Severity        string  `yaml:"severity"` // "hard" | "soft"
-	Statement       string  `yaml:"statement"`
-	Support         float64 `yaml:"support"`
-	RequireEvidence bool    `yaml:"require_evidence"`
+	ID              string   `yaml:"id"`
+	Class           string   `yaml:"class"`    // "deterministic" | "judged"
+	Severity        string   `yaml:"severity"` // "hard" | "soft"
+	Statement       string   `yaml:"statement"`
+	Support         float64  `yaml:"support"`
+	Param           float64  `yaml:"param,omitempty"` // mined threshold for deterministic rules
+	Counterexamples []string `yaml:"counterexamples,omitempty"`
+	RequireEvidence bool     `yaml:"require_evidence,omitempty"`
 }
 
 // Exemplars points at the embedded exemplar index used for retrieval-augmented

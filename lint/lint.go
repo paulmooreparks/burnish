@@ -6,11 +6,11 @@
 package lint
 
 import (
-	"math"
 	"sort"
 	"strings"
 
 	"github.com/paulmooreparks/burnish/distill"
+	"github.com/paulmooreparks/burnish/internal/num"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
 
@@ -78,10 +78,10 @@ func Check(draft string, p *stylespec.Profile) (Result, error) {
 		weightedSum += f.Weight * dev
 		fv := FeatureViolation{
 			ID:        f.ID,
-			Value:     round(v, 4),
+			Value:     num.Round(v, 4),
 			Min:       f.Target.Min,
 			Max:       f.Target.Max,
-			Deviation: round(dev, 3),
+			Deviation: num.Round(dev, 3),
 			Weight:    f.Weight,
 			Severity:  severity(f, v),
 		}
@@ -91,7 +91,7 @@ func Check(draft string, p *stylespec.Profile) (Result, error) {
 		res.Features = append(res.Features, fv)
 	}
 	if weightTotal > 0 {
-		res.Distance = round(weightedSum/weightTotal, 4)
+		res.Distance = num.Round(weightedSum/weightTotal, 4)
 	}
 
 	// Worst contributors first.
@@ -159,9 +159,4 @@ func findAvoided(draft string, avoided []string) []LexicalViolation {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Start < out[j].Start })
 	return out
-}
-
-func round(f float64, places int) float64 {
-	p := math.Pow10(places)
-	return math.Round(f*p) / p
 }

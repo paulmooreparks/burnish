@@ -317,8 +317,11 @@ deterministic skeleton comes first.
    `style_review`. First measured result: authentic-essay vs AI-technical-prose
    AUC ~0.80. The calibrated LLM judge is the upgrade, reusing this same
    held-out-vs-decoys protocol with the caller's inference.
-5. Rule mining + `judge/` payload (validated rules + evidence ask), wired into
-   `style_review`.
+5. **[done, first cut]** Rule mining (`judge/`), deterministic: mine per-instance
+   structural rules (max sentence/paragraph length) with corpus-validated support,
+   attach to the profile, and flag violations the aggregate distance hides (a lone
+   run-on). Wired into `score` and `style_review`. The LLM-induced *subjective*
+   rules + judging payload (validated rules + evidence ask) are the upgrade.
 6. Exemplar retrieval (`retrieve/`), then the full massage loop (`enforce/`),
    then the Stop hook (the enforcement guarantee), then the `model/` headless
    adapter and `serve` mode.

@@ -8,6 +8,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/paulmooreparks/burnish/distill"
+	"github.com/paulmooreparks/burnish/judge"
 	"github.com/paulmooreparks/burnish/lint"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
@@ -123,12 +124,18 @@ type scoreArgs struct {
 	Text        string `json:"text" jsonschema:"the draft text to score"`
 }
 
-func handleScore(ctx context.Context, _ *sdk.CallToolRequest, a scoreArgs) (*sdk.CallToolResult, lint.Result, error) {
+type scoreResult struct {
+	lint.Result
+	RuleViolations []judge.RuleViolation `json:"rule_violations,omitempty"`
+}
+
+func handleScore(ctx context.Context, _ *sdk.CallToolRequest, a scoreArgs) (*sdk.CallToolResult, scoreResult, error) {
 	prof, res, err := loadAndCheck(a.ProfilePath, a.Text)
 	if err != nil {
-		return errResult[lint.Result](err.Error())
+		return errResult[scoreResult](err.Error())
 	}
-	return textResult(scoreSummary(prof, res), res)
+	rv := judge.CheckRules(a.Text, prof.Rules)
+	return textResult(scoreSummary(prof, res)+ruleSummary(rv), scoreResult{res, rv})
 }
 
 // --- style_review --------------------------------------------------------
@@ -148,6 +155,7 @@ type reviewResult struct {
 	PreferredLexicon []string                `json:"preferred_lexicon,omitempty"`
 	AvoidedLexicon   []string                `json:"avoided_lexicon,omitempty"`
 	Rules            []stylespec.Rule        `json:"rules,omitempty"`
+	RuleViolations   []judge.RuleViolation   `json:"rule_violations,omitempty"`
 	Judgement        string                  `json:"judgement"`
 	Guidance         string                  `json:"guidance"`
 }
@@ -165,6 +173,7 @@ func handleStyleReview(ctx context.Context, _ *sdk.CallToolRequest, a reviewArgs
 			judgement = "deterministic discriminator: OFF-TARGET (distance exceeds calibrated threshold)"
 		}
 	}
+	rv := judge.CheckRules(a.Text, prof.Rules)
 	rev := reviewResult{
 		Distance:         res.Distance,
 		OnTarget:         res.OnTarget,
@@ -175,16 +184,30 @@ func handleStyleReview(ctx context.Context, _ *sdk.CallToolRequest, a reviewArgs
 		PreferredLexicon: prof.Lexicon.Preferred,
 		AvoidedLexicon:   prof.Lexicon.Avoided,
 		Rules:            prof.Rules,
+		RuleViolations:   rv,
 		Judgement:        judgement,
-		Guidance: "Revise the draft to bring the off-target features into range and remove avoided terms, " +
-			"favoring the preferred lexicon. The deterministic discriminator gives a distance-threshold verdict; " +
-			"the richer rule-based LLM judgement is not built yet. When you judge, do it in a FRESH, ISOLATED " +
-			"context (a separate subagent or invocation), never the one that wrote the draft.",
+		Guidance: "Revise the draft to bring the off-target features into range, remove avoided terms, favor the " +
+			"preferred lexicon, and fix the listed deterministic rule_violations. The deterministic discriminator " +
+			"gives a distance-threshold verdict and the deterministic rules are checked here; the richer LLM-judged " +
+			"subjective rules are not built yet. When you judge, do it in a FRESH, ISOLATED context (a separate " +
+			"subagent or invocation), never the one that wrote the draft.",
 	}
-	return textResult(reviewSummary(prof, res), rev)
+	return textResult(reviewSummary(prof, res)+ruleSummary(rv), rev)
 }
 
 // --- shared helpers ------------------------------------------------------
+
+func ruleSummary(rv []judge.RuleViolation) string {
+	if len(rv) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\nrule violations:\n")
+	for _, v := range rv {
+		fmt.Fprintf(&b, "  [%s] %s (para %d): %s\n", v.Severity, v.Statement, v.Paragraph, v.Evidence)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
 
 func loadAndCheck(profilePath, text string) (*stylespec.Profile, lint.Result, error) {
 	if profilePath == "" {

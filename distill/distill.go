@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/paulmooreparks/burnish/internal/num"
 	"github.com/paulmooreparks/burnish/internal/text"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
@@ -106,8 +107,8 @@ func Distill(id, register, language string, docs []DocInput, opts Options) (*sty
 		mean, std := meanStddev(vals)
 		f := stylespec.Feature{
 			ID:     id,
-			Mean:   round(mean, 4),
-			Stddev: round(std, 4),
+			Mean:   num.Round(mean, 4),
+			Stddev: num.Round(std, 4),
 			Weight: weightFor(id, mean, std),
 		}
 		half := opts.RangeK * std
@@ -116,7 +117,7 @@ func Distill(id, register, language string, docs []DocInput, opts Options) (*sty
 			min = 0
 		}
 		max := mean + half
-		f.Target = stylespec.Target{Min: stylespec.Ptr(round(min, 4)), Max: stylespec.Ptr(round(max, 4))}
+		f.Target = stylespec.Target{Min: stylespec.Ptr(num.Round(min, 4)), Max: stylespec.Ptr(num.Round(max, 4))}
 		prof.Features = append(prof.Features, f)
 	}
 
@@ -153,7 +154,7 @@ func weightFor(id string, mean, std float64) float64 {
 	case w > 1.0:
 		return 1.0
 	default:
-		return round(w, 3)
+		return num.Round(w, 3)
 	}
 }
 
@@ -182,9 +183,4 @@ func isNonNegative(id string) bool {
 	// is reading_grade, which can be negative for very simple text, so leave it
 	// unclamped.
 	return id != MReadingGrade
-}
-
-func round(f float64, places int) float64 {
-	p := math.Pow10(places)
-	return math.Round(f*p) / p
 }
