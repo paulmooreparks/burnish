@@ -337,9 +337,14 @@ deterministic skeleton comes first.
 6. **[done, first cut]** Exemplar retrieval (`retrieve/`), deterministic: a
    TF-IDF cosine bank over corpus chunks (`burnish retrieve`), returning
    topically-relevant authentic-style passages as few-shot, no embedding model.
-   Dense semantic embeddings are the upgrade. Then the full massage loop
-   (`enforce/`), the Stop hook (the enforcement guarantee), and the `model/`
-   headless adapter + `serve` mode.
+   Dense semantic embeddings are the upgrade.
+7. **[done, first cut]** The massage loop (`enforce/`): `Massage` runs
+   lint -> judge -> retrieve -> discriminate -> revise, bounded at N, with the
+   revise step an injected `Reviser` (the caller's LLM; the agentic path can drive
+   the same loop via the MCP `style_review` tool). Acceptance = no hard violations
+   and on-target. Exposed via `pkg/api`. Demonstrated: one revision drove a generic
+   draft 0.48 -> 0.29 toward Paul's essay voice. Remaining: the Stop hook (the
+   enforcement guarantee) and the `model/` headless adapter + `serve` mode.
 
 Steps 1-2 (the deterministic walking skeleton) are already useful standalone:
 point `score` at any draft and see how far from the target voice it sits.
