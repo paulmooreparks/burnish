@@ -7,58 +7,65 @@ they live as local artifacts and are regenerated from a corpus by `distill`. Onl
 this manifest is committed, and it documents each profile so it is reproducible.
 The raw corpus is not committed either.
 
-## The corpus must be authentically human
+## The corpus must be authentically human AND single-register
 
-The target corpus has to be writing the person actually wrote. AI-generated or
-AI-co-authored text is the *negative* class the discriminator exists to detect;
-putting it in the target corpus calibrates the profile toward the very voice we
-are trying to move away from. A first cut of this profile was distilled from
-design docs and PRDs that turned out to be mostly AI-written, which is exactly
-that mistake. It was discarded and rebuilt from hand-written essays.
+Two failure modes degrade a profile, both quietly:
+
+1. **Authorship.** The corpus has to be writing the person actually wrote.
+   AI-generated or AI-co-authored text is the *negative* class the discriminator
+   exists to detect; putting it in the target corpus calibrates toward the voice
+   we are moving away from. An early cut was distilled from design docs/PRDs that
+   were mostly AI-written, then discarded and rebuilt from hand-written essays.
+2. **Register.** Even all-authentic, all-Paul text averages into mush if it mixes
+   registers (DESIGN section 4). A personal-essay profile must not be diluted with
+   a business plan, video scripts, a job description, or code walk-throughs.
 
 ## paul-essays.profile.yaml
 
-- **Register:** `personal-essay` — Paul's hand-written personal/opinion essays and
-  articles from parkscomputing.com. Deliberately homogeneous: excludes tutorials
-  and code walk-throughs, product/landing pages, the resume, a job description, a
-  business plan, reference docs, and video scripts (all different registers).
-- **Language:** `en`.
-- **Corpus:** 25 essays, ~16K words, from
-  `~/OneDrive/Documents/parkscomputing.com/wwwroot/content`.
-  - HTML (body text extracted): barbecue-and-project-management,
-    becoming-a-developer-overnight-in-only-five-years, buzzword-bucket,
-    compute-magazine-archives, george-orwell-and-effective-coding, how-i-plan-my-day,
-    it-is-okay-to-be-just-okay, master-foo-and-the-technical-recruiter, on-recruiting,
-    personas-in-the-wild, scheduling-every-minute-revisited
-  - Markdown: how-many-years-of-pizza, i-hate-screenshots-of-text, just-spell-the-month,
-    learning-theory, my-closet-is-an-lru-cache, next-train-to-bracknell, not-the-droid,
-    on-travelling, one-word-or-two, parks-laws-of-debugging, power-of-guitar,
-    so-much-more-exotic, using-ai, vibe-coding
+- **Register:** `personal-essay` — Paul's hand-written reflective/opinion essays.
+- **Language:** `en`. **Avoided:** `—`, `--` (Paul's standing preference; per-profile).
+- **Corpus:** 13 markdown essays, ~5.1K words of cleaned prose, curated (burnish-13)
+  from the `.md` files under `~/OneDrive/Documents/parkscomputing.com/wwwroot/content`.
+  The distiller ingests only `.md`/`.txt`, so that `.md` set (34 docs) was the raw
+  pool; 13 were kept, 21 dropped.
+  - **Kept:** next-train-to-bracknell, not-the-droid, vibe-coding,
+    parks-laws-of-debugging, power-of-guitar, how-many-years-of-pizza,
+    i-hate-screenshots-of-text, so-much-more-exotic, fixing-the-plumbing,
+    learning-theory, on-travelling, just-spell-the-month, one-word-or-two.
+  - **Dropped, contaminated/not-Paul:** my-closet-is-an-lru-cache (mostly AI,
+    per Paul), accessibility-guidelines, using-ai, maize-summary, ui-engine.
+  - **Dropped, off-register:** bizplan, six video scripts, agile-bridge-jd,
+    fizzbuzz + two cache/sitenav code walk-throughs, cloudflared-service-fix,
+    house-images, act-now-before-price-increase, my-llm-experience stub,
+    tela-and-awan-saya (empty section headings).
 
 ### Reproduce
 
-HTML body text is extracted (tags stripped, headings/lists mapped to Markdown);
-Markdown frontmatter and fenced code blocks are stripped. Gather the cleaned
-essays into one directory (kept out of git), then:
+`scripts/build-essay-corpus.sh` holds the keep-list and per-drop rationale. It
+copies the kept essays into `corpus/paul-essays/` (gitignored), stripping YAML
+front matter, HTML tags, markdown links/images, and bare URLs so only prose
+reaches the distiller. Then:
 
 ```
-burnish distill --corpus <dir> --register personal-essay \
-  --id paul-essays --out profiles/paul-essays.profile.yaml
+scripts/build-essay-corpus.sh                 # writes corpus/paul-essays/
+burnish distill --corpus corpus/paul-essays --register personal-essay \
+  --id paul-essays --avoid "—,--" --out profiles/paul-essays.profile.yaml
 ```
 
-### What the signature captures
+### What the curation bought
 
-Versus the earlier AI-corpus attempt, the authentic voice is unmistakable:
-first-person rate ~45 per 1000 words (the AI design docs sat near 2), contraction
-rate ~14, longer sentences (~21 words), reading grade ~10. An authentic in-corpus
-essay scores 0.12; an AI-written design doc 0.31; a generic-LLM draft 0.92.
+The pre-curation profile (all 34 `.md`, 27K words) had a lexicon dominated by the
+off-register docs: `cache`, `docker`, `lru`, `infrastructure`, `eviction`,
+`xferlang`, `runtime`, plus leaked front-matter fields (`commentsallowed`,
+`lastmodified`) and base64 media ids. After curation the preferred lexicon is
+genuine essay vocabulary: `bracknell`, `hotel`, `singapore`, `travel`/`travelling`,
+`playing`, `spell`, `month`, `realized`, `perspective`. Same engine, clean corpus.
 
-### Known artifacts (to clean later)
+### Notes
 
-- A few lexicon entries are extraction noise, not voice: `https` / `com` / `org`
-  (visible URLs split on punctuation), `alt`, and `ive` (from "I've" losing its
-  apostrophe). A URL-strip in extraction and the larger-baseline card would clean
-  these.
-- The naive `--` avoided-term check matches Markdown horizontal rules and table
-  separators (`---`, `|---|`), so scoring raw Markdown can report many spurious
-  hard violations. Tracked as a separate fix.
+- Front-matter/HTML/link stripping is done by the build script for this corpus.
+  Doing it inside `distill` (so the MCP/CLI path benefits for any corpus) is a
+  tracked follow-up.
+- The `--` avoided-term check still matches Markdown horizontal rules / table
+  separators, so scoring raw Markdown can report spurious hard violations; score
+  cleaned prose, or treat that as the separate tracked fix.

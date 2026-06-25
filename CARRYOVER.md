@@ -1,7 +1,7 @@
 # burnish: Carryover
 
 > Resume context. Read this first, then [DESIGN.md](DESIGN.md).
-> Last updated: 2026-06-24 (walking skeleton built).
+> Last updated: 2026-06-25 (all build-order surfaces complete; everything pushed).
 
 ## What this is
 
@@ -27,8 +27,11 @@ the generating model into a separate, deterministic-plus-adversarial checker.
     per-feature off-target list + avoided-term spans + hard/soft severity.
   - `mcp/` MCP server (official go-sdk, stdio) exposing `distill`, `score`,
     `style_review`; integration-tested via in-memory transport + real stdio.
-  - `cmd/burnish` CLI: `distill`, `score`, `mcp` subcommands.
-  - `judge/ retrieve/ discriminate/ enforce/ model/ pkg/api` documented stubs.
+  - `cmd/burnish` CLI: `distill`, `score`, `calibrate`, `retrieve`, `hook`,
+    `mcp`, `serve` subcommands.
+  - `judge/ retrieve/ discriminate/ enforce/ pkg/api` all built. `model/` (the
+    headless Anthropic adapter) and `serve/` (the Fielding-HATEOAS HTTP API) are
+    built + mock-tested (burnish-7); the one live API smoke test is Paul's.
 - **Smoke-tested end to end.** Distilled a 5-doc long-form profile (Arch
   Principles + Overt/Andoneer/burnish design docs). Generic-LLM draft scored
   5.21 with 3 hard violations (em-dash + 84-sigma hedge rate); Paul-style draft
@@ -119,16 +122,48 @@ FILE via `--base`. The Stop hook enforces only what the user configures
 (`--avoid`/`--profile`/`$BURNISH_AVOID`/`$BURNISH_PROFILE`); unconfigured = nothing.
 Em-dash is otherwise just a soft feature.
 
-Remaining (board). The whole engine + all no-API surfaces are done and PUSHED. What
-is left needs the Anthropic API or is minor:
-1. **burnish-7 `model/` adapter + `serve`**: headless inference + HTTP sidecar for
-   .NET. First Anthropic-API wiring (Paul is building/testing this). CONSTRAINT
-   recorded: the serve REST API MUST be Fielding-style (HATEOAS), and code review
-   MUST enforce it (a non-hypermedia/RPC-over-HTTP design is a review failure).
-2. **burnish-11 LLM-induced subjective rules** (judged-rule upgrade; needs the API
-   or an in-session agent). Dense embeddings for retrieval whenever.
+**burnish-11 LLM-induced subjective rules: DONE.** judge/judged.go builds the
+induction + judging PAYLOADS; the caller's LLM renders them (no baked model). Five
+judged rules were induced in-session for the essay profile and persist via
+`distill --rules-file` (merged post-Resolve, deduped by id). style_review hands the
+agent the judging prompt. Found while reading the essays: the corpus contains at
+least one non-Paul guest post -> filed **burnish-13** (re-curate corpus for
+authorship).
 
-Done since: **burnish-10 distinctiveness baseline** rebuilt from real corpora
+**burnish-7 `model/` adapter + `serve`: DONE (build + mock).** Stdlib-only Anthropic
+Messages client (injectable Doer, Reviser + JudgeRules, max_tokens-truncation
+guard); no new go.mod dependency, so the dependency-approval gate is retired. The
+`serve` HTTP API is Fielding-style (HATEOAS): hypermedia `_links`, reachability from
+`/`, the massage action ABSENT from a profile unless a reviser is configured (405 +
+reason=no_reviser on a direct POST). Adversarial review signed off the mandate.
+Commit 825f58a, pushed. Two things stay Paul's / follow-up: the one live API smoke
+test, and **burnish-14** (wire judged-rule verdicts into the enforce.Massage loop;
+JudgeRules exists but the loop takes only a Reviser today).
+
+**burnish-13 corpus re-curation: DONE.** The "Paul" profile had been distilled from
+all 34 .md docs under the parkscomputing content tree, which mixed registers badly
+(a 5965-word business plan, six video scripts, a JD, code walk-throughs, ops notes)
+plus non-Paul/contaminated docs. Audited all 34; curated to 13 single-register
+personal essays via `scripts/build-essay-corpus.sh` (keep-list + drop rationale in
+its header; strips front matter, HTML, markdown links/images, bare URLs). Paul flagged
+my-closet-is-an-lru-cache as mostly AI (a false keep the automated audit missed,
+authorship is the author's call), so it was dropped: 13, not 14. Re-distilled to
+`profiles/paul-essays.profile.yaml` (gitignored, local). The lexicon went from
+business/infra terms (cache, docker, lru, xferlang) + leaked front-matter fields to
+genuine essay vocabulary (bracknell, hotel, singapore, travel, perspective).
+
+**Extraction is now a first-class requirement (Paul, 2026-06-25):** "all of this
+extraction stuff is going to be critical to people actually using burnish ... Either
+we make it part of the tool or document the hell out of it." The HTML essays hold a
+lot of good prose too. So the next work is to build corpus ingestion (HTML extraction
++ markdown/front-matter normalization) INTO the tool (burnish-15, broadened from a
+distill-only strip), then re-curate Paul's corpus including the HTML essays.
+
+Remaining (board): burnish-15 (first-class corpus ingestion: HTML + markdown
+normalization, built-in + documented), burnish-14 (judged rules in massage loop),
+add the HTML essays to the corpus once ingestion exists, dense embeddings (whenever).
+
+Done earlier: **burnish-10 distinctiveness baseline** rebuilt from real corpora
 (Project Gutenberg public-domain prose + a modern Wikipedia sample, ~10k-word
 frequency table; real frequencies not Zipf-from-rank; non-prose stoplist). The
 paul-essays lexicon now surfaces genuine vocabulary (schedule, guitar, coding,
@@ -137,9 +172,10 @@ modest; more modern text would sharpen it. (Actual blogs are copyrighted/not
 scrapeable, so Wikipedia is the legal modern proxy.)
 
 Repo hygiene: repo is **public**; profiles are gitignored user data, never
-committed. Local history was re-rooted onto the real initial commit, so
-publishing is a clean **fast-forward** `git push origin main` (no force-push).
-Nothing is pushed yet.
+committed. History was re-rooted onto the real initial commit; everything since is
+a clean fast-forward and is **pushed** to origin/main (HEAD 825f58a). The on-disk
+folder is still `bluepencil`; the GitHub repo rename to `burnish` is pending on
+Paul.
 
 ## Known limits in the current skeleton (address as they bite)
 
