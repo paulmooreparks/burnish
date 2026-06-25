@@ -126,9 +126,15 @@ is left needs the Anthropic API or is minor:
    recorded: the serve REST API MUST be Fielding-style (HATEOAS), and code review
    MUST enforce it (a non-hypermedia/RPC-over-HTTP design is a review failure).
 2. **burnish-11 LLM-induced subjective rules** (judged-rule upgrade; needs the API
-   or an in-session agent).
-3. **burnish-10 larger lexicon baseline** (minimal, no API; PAUSED mid-start to do
-   burnish-12). Dense embeddings for retrieval whenever.
+   or an in-session agent). Dense embeddings for retrieval whenever.
+
+Done since: **burnish-10 distinctiveness baseline** rebuilt from real corpora
+(Project Gutenberg public-domain prose + a modern Wikipedia sample, ~10k-word
+frequency table; real frequencies not Zipf-from-rank; non-prose stoplist). The
+paul-essays lexicon now surfaces genuine vocabulary (schedule, guitar, coding,
+recruiter, bracknell) instead of markup noise. Modern (Wikipedia) sample is
+modest; more modern text would sharpen it. (Actual blogs are copyrighted/not
+scrapeable, so Wikipedia is the legal modern proxy.)
 
 Repo hygiene: repo is **public**; profiles are gitignored user data, never
 committed. Local history was re-rooted onto the real initial commit, so
