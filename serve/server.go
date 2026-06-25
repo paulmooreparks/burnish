@@ -55,6 +55,7 @@ type links map[string]link
 type Server struct {
 	profiles map[string]*stylespec.Profile
 	reviser  enforce.Reviser // nil => deterministic-only; the massage action is absent
+	judge    enforce.Judge   // optional; folds judged-rule verdicts into massage
 
 	mu      sync.Mutex
 	store   map[string]any
@@ -67,6 +68,7 @@ type Server struct {
 type Options struct {
 	Profiles map[string]*stylespec.Profile
 	Reviser  enforce.Reviser // optional; nil disables the massage action
+	Judge    enforce.Judge   // optional refinement of massage; only used when Reviser is also set
 	StoreCap int             // optional; defaults to defaultStoreCap
 }
 
@@ -79,6 +81,7 @@ func New(opts Options) *Server {
 	return &Server{
 		profiles: opts.Profiles,
 		reviser:  opts.Reviser,
+		judge:    opts.Judge,
 		store:    make(map[string]any),
 		storeCap: cap,
 	}
@@ -286,7 +289,7 @@ func (s *Server) handleCreateMassage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	out, err := enforce.Massage(r.Context(), draft, p, nil, s.reviser, enforce.Options{})
+	out, err := enforce.Massage(r.Context(), draft, p, nil, s.reviser, enforce.Options{Judge: s.judge})
 	if err != nil {
 		s.serverError(w, err.Error())
 		return

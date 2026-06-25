@@ -61,15 +61,6 @@ func NewClient(apiKey string) *Client {
 	}
 }
 
-// Verdict is one judged-rule judgement: whether the rule holds on the draft, and
-// (when it does not) the quoted offending span. It mirrors the JSON shape the
-// JudgingPrompt asks the model to return.
-type Verdict struct {
-	ID       string `json:"id"`
-	Holds    bool   `json:"holds"`
-	Evidence string `json:"evidence,omitempty"`
-}
-
 // Reviser returns an enforce.Reviser bound to this client. It is the headless
 // substitute for the calling agent's LLM: enforce.Massage hands it the brief and
 // the current draft each iteration, and it returns the revised text. Plugs
@@ -89,12 +80,11 @@ func (c *Client) Reviser() enforce.Reviser {
 // filters to class="judged" and requires quoted evidence) and parses the model's
 // JSON verdict array. If the profile carries no judged rules it returns nil.
 //
-// This is a building block for headless callers. enforce.Massage takes only a
-// Reviser, so the serve massage loop currently enforces the deterministic rules
-// and the calibrated discriminator but does NOT yet feed judged-rule verdicts
-// back into revision; a headless caller can call JudgeRules directly. Wiring a
-// judge hook into the massage loop is a follow-up (see CARRYOVER).
-func (c *Client) JudgeRules(ctx context.Context, draft string, rules []stylespec.Rule) ([]Verdict, error) {
+// Its signature matches enforce.Judge, so it plugs straight into the massage loop
+// as enforce.Options.Judge: serve wires it when an API key is present, and the
+// headless loop then feeds judged-rule verdicts (with quoted evidence) back into
+// revision alongside the deterministic signals.
+func (c *Client) JudgeRules(ctx context.Context, draft string, rules []stylespec.Rule) ([]judge.RuleVerdict, error) {
 	if len(judge.JudgedRules(rules)) == 0 {
 		return nil, nil
 	}
@@ -142,13 +132,13 @@ func renderRevisionUser(draft string, brief enforce.Brief) string {
 
 // parseVerdicts extracts the JSON verdict array from the model's reply, tolerating
 // surrounding prose or a ```json fence by slicing to the outermost brackets.
-func parseVerdicts(s string) ([]Verdict, error) {
+func parseVerdicts(s string) ([]judge.RuleVerdict, error) {
 	start := strings.IndexByte(s, '[')
 	end := strings.LastIndexByte(s, ']')
 	if start < 0 || end < 0 || end < start {
 		return nil, fmt.Errorf("no JSON array in model reply: %q", truncate(s, 200))
 	}
-	var v []Verdict
+	var v []judge.RuleVerdict
 	if err := json.Unmarshal([]byte(s[start:end+1]), &v); err != nil {
 		return nil, fmt.Errorf("parse verdicts: %w", err)
 	}

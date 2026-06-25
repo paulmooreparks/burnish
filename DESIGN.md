@@ -386,12 +386,15 @@ deterministic skeleton comes first.
    TF-IDF cosine bank over corpus chunks (`burnish retrieve`), returning
    topically-relevant authentic-style passages as few-shot, no embedding model.
    Dense semantic embeddings are the upgrade.
-7. **[done, first cut]** The massage loop (`enforce/`): `Massage` runs
+7. **[done]** The massage loop (`enforce/`): `Massage` runs
    lint -> judge -> retrieve -> discriminate -> revise, bounded at N, with the
    revise step an injected `Reviser` (the caller's LLM; the agentic path can drive
-   the same loop via the MCP `style_review` tool). Acceptance = no hard violations
-   and on-target. Exposed via `pkg/api`. Demonstrated: one revision drove a generic
-   draft 0.48 -> 0.29 toward Paul's essay voice.
+   the same loop via the MCP `style_review` tool). Subjective judged rules are an
+   optional injected `Judge` hook (same caller-inference model as `Reviser`):
+   failing verdicts fold into the brief with quoted evidence and a hard one blocks
+   acceptance; nil `Judge` is deterministic-only. Acceptance = no hard violations
+   (lint or rule) and on-target. Exposed via `pkg/api`. Demonstrated: one revision
+   drove a generic draft 0.48 -> 0.29 toward Paul's essay voice.
 8. **[done]** The Claude Code **Stop hook** (`burnish hook`): the push-enforcement
    guarantee. Reads the stop payload, extracts the last top-level assistant turn
    (skipping subagent sidechains), and blocks the stop on hard violations so Claude
@@ -405,8 +408,9 @@ deterministic skeleton comes first.
    (HATEOAS) HTTP REST API over the engine: hypermedia representations with
    `_links`, link-driven reachability from `/`, and the massage action absent
    from a profile unless a reviser is configured. Tested entirely against a
-   mocked transport + stub reviser; no live API call. Live smoke test +
-   judged-rules-in-the-massage-loop wiring are follow-ups.
+   mocked transport + stub reviser; no live API call. (Live smoke test since
+   passed; judged-rules-in-the-massage-loop wiring landed via the `enforce.Judge`
+   hook, with `model.JudgeRules` as the headless judge.)
 
 Steps 1-2 (the deterministic walking skeleton) are already useful standalone:
 point `score` at any draft and see how far from the target voice it sits.

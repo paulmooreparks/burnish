@@ -164,9 +164,18 @@ framing) to prose .md via html_extract. Corpus grew 13->21 docs, ~5K->~11.7K wor
 profiles/paul-essays.profile.yaml re-distilled, lexicon on-register (unix, hacker, foo,
 compute, guitar, customer, calendar, productivity).
 
-Remaining (board): burnish-15 (document corpus preparation thoroughly; now unblocked
-by burnish-16, cites the HTML-capable build script as the reference), burnish-14 (judged
-rules in massage loop), dense embeddings for retrieval (whenever).
+**burnish-14 judged rules in the massage loop: DONE.** enforce.Massage gained an
+optional `Judge` hook (caller's inference, mirroring `Reviser`; nil = deterministic-
+only). Failing judged verdicts fold into the revision brief with quoted evidence; a
+hard-severity rule violation of any class now blocks acceptance (soft only informs).
+`model.JudgeRules` returns `[]judge.RuleVerdict` and plugs straight in; serve wires it
+when ANTHROPIC_API_KEY is set. Closes the agentic/headless parity gap from the
+burnish-7 review.
+
+Remaining (board): burnish-15 (corpus-prep docs) and burnish-13/16/17 are DONE;
+burnish-18 (validate house voice on a real multi-author corpus, operator-gated on a
+corpus from Paul); dense embeddings for retrieval (whenever). The whole build order
+(steps 1-9) is complete.
 
 Done earlier: **burnish-10 distinctiveness baseline** rebuilt from real corpora
 (Project Gutenberg public-domain prose + a modern Wikipedia sample, ~10k-word

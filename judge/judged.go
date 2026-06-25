@@ -72,6 +72,18 @@ func JudgingPrompt(draft string, rules []stylespec.Rule) string {
 	return b.String()
 }
 
+// RuleVerdict is one judged-rule judgement returned by whoever renders the
+// JudgingPrompt (the caller's LLM in the agentic path, the model/ adapter in the
+// headless path). It mirrors the JSON shape the prompt asks for: the rule id,
+// whether the rule holds on the draft, and (when it does not) the quoted offending
+// span. A Holds==false verdict is a violation; require_evidence binds the judge to
+// quote Evidence so the revision is actionable.
+type RuleVerdict struct {
+	ID       string `json:"id"`
+	Holds    bool   `json:"holds"`
+	Evidence string `json:"evidence,omitempty"`
+}
+
 // JudgedRules returns the judged (subjective) rules from a rule set.
 func JudgedRules(rules []stylespec.Rule) []stylespec.Rule {
 	var out []stylespec.Rule

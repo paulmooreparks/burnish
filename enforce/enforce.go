@@ -9,6 +9,11 @@
 // (which can equivalently drive the loop itself via the MCP style_review tool);
 // in the headless path it is the model/ adapter; in tests it is a mock. enforce
 // never bakes a model.
+//
+// Subjective judged rules are likewise the caller's inference, supplied as an
+// optional Judge hook (same three sources as Reviser). Failing verdicts fold into
+// the revision brief alongside the deterministic violations, and a hard one blocks
+// acceptance; nil Judge skips judged rules entirely.
 package enforce
 
 import (
@@ -25,6 +30,14 @@ import (
 // Reviser rewrites a draft given a revision brief, returning the revised text. It
 // is where inference happens; enforce supplies the brief and owns the loop.
 type Reviser func(ctx context.Context, draft string, brief Brief) (string, error)
+
+// Judge renders the judged (subjective) style rules against a draft, returning a
+// verdict per rule. Like Reviser it is the caller's inference (decision #5): the
+// calling agent's LLM in the agentic path, the model/ adapter in the headless
+// path, a mock in tests. enforce never bakes a model; it owns the loop and folds
+// the verdicts into the revision brief and the acceptance gate. nil means skip
+// judged rules entirely (deterministic-only enforcement).
+type Judge func(ctx context.Context, draft string, judged []stylespec.Rule) ([]judge.RuleVerdict, error)
 
 // Brief is the consolidated, actionable guidance handed to the reviser each
 // iteration: every deterministic signal plus the retrieved exemplars.
@@ -63,6 +76,9 @@ type Outcome struct {
 type Options struct {
 	MaxRevisions int // default 3 (DESIGN N = 2-3)
 	Exemplars    int // exemplars retrieved per iteration; default 3
+	// Judge optionally renders the profile's judged (subjective) rules each
+	// iteration. nil = skip them (deterministic-only). See the Judge type.
+	Judge Judge
 }
 
 // Massage drives the loop. bank may be nil (no exemplar retrieval); revise may be
@@ -86,7 +102,28 @@ func Massage(ctx context.Context, draft string, p *stylespec.Profile, bank *retr
 			return nil, err
 		}
 		rules := judge.CheckRules(cur, p.Rules)
-		accepted := res.HardViolations == 0 && (res.OnTarget == nil || *res.OnTarget)
+		// Judged (subjective) rules: rendered by the caller via the Judge hook, in a
+		// fresh isolated context. Failing verdicts fold into the same rule-violation
+		// list the brief and gate use, so the reviser sees them with quoted evidence
+		// alongside the deterministic violations.
+		if opts.Judge != nil {
+			if jr := judge.JudgedRules(p.Rules); len(jr) > 0 {
+				verdicts, err := opts.Judge(ctx, cur, jr)
+				if err != nil {
+					return nil, fmt.Errorf("judge (revision %d): %w", out.Revisions, err)
+				}
+				rules = append(rules, judgedViolations(verdicts, jr)...)
+			}
+		}
+		// A hard-severity rule violation of any class blocks acceptance, alongside
+		// the lint hard violations and the discriminator. Soft violations only inform.
+		hardRules := 0
+		for _, rv := range rules {
+			if rv.Severity == "hard" {
+				hardRules++
+			}
+		}
+		accepted := res.HardViolations == 0 && hardRules == 0 && (res.OnTarget == nil || *res.OnTarget)
 		out.Trajectory = append(out.Trajectory, Step{
 			Revision:       out.Revisions,
 			Distance:       res.Distance,
@@ -118,6 +155,34 @@ func Massage(ctx context.Context, draft string, p *stylespec.Profile, bank *retr
 		}
 		cur = revised
 	}
+}
+
+// judgedViolations maps Holds==false judged verdicts to RuleViolations, pulling
+// severity and statement from the matching rule (verdicts for unknown ids are
+// ignored). The quoted Evidence comes from the judge; Paragraph is 0 because a
+// judged rule is evaluated against the whole draft, not a single paragraph.
+func judgedViolations(verdicts []judge.RuleVerdict, judged []stylespec.Rule) []judge.RuleViolation {
+	byID := make(map[string]stylespec.Rule, len(judged))
+	for _, r := range judged {
+		byID[r.ID] = r
+	}
+	var out []judge.RuleViolation
+	for _, v := range verdicts {
+		if v.Holds {
+			continue
+		}
+		r, ok := byID[v.ID]
+		if !ok {
+			continue
+		}
+		out = append(out, judge.RuleViolation{
+			RuleID:    r.ID,
+			Statement: r.Statement,
+			Severity:  r.Severity,
+			Evidence:  v.Evidence,
+		})
+	}
+	return out
 }
 
 func buildBrief(res lint.Result, rules []judge.RuleViolation, exemplars []retrieve.Result, p *stylespec.Profile) Brief {

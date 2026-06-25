@@ -121,6 +121,7 @@ func cmdServe(args []string) error {
 		mc := model.NewClient(key)
 		mc.Model = *modelName
 		opts.Reviser = mc.Reviser()
+		opts.Judge = mc.JudgeRules // judged-rule verdicts inside the massage loop
 	}
 	return serve.New(opts).ListenAndServe(context.Background(), *addr)
 }
