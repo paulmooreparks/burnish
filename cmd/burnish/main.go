@@ -42,6 +42,8 @@ func main() {
 		err = cmdCalibrate(os.Args[2:])
 	case "retrieve":
 		err = cmdRetrieve(os.Args[2:])
+	case "hook":
+		err = cmdHook(os.Args[2:])
 	case "mcp":
 		err = bpmcp.Serve(context.Background())
 	case "-h", "--help", "help":
@@ -66,12 +68,16 @@ usage:
   burnish score     --profile FILE [FILE]
   burnish calibrate --target DIR --decoys DIR --register NAME [--id ID] [--out FILE] [--holdout-every N]
   burnish retrieve  --corpus DIR --query TEXT [-k N] [--min-words N]
+  burnish hook      [--profile FILE]
   burnish mcp
 
   calibrate builds a profile from the target corpus and derives a discriminator
   threshold separating held-out target text from the decoy (off-style) corpus.
   retrieve returns the corpus passages most relevant to a query, as target-style
   few-shot exemplars.
+  hook is the Claude Code Stop hook: reads the stop payload on stdin and blocks
+  the turn on hard style violations (defaults to the base em-dash invariant;
+  --profile or $BURNISH_PROFILE adds a register's hard rules).
   score reads the draft from FILE or, if omitted, from stdin.
   Add --json to score for machine-readable output.
   mcp runs the MCP server over stdio (distill, score, style_review tools).

@@ -146,6 +146,33 @@ Register it with Claude Code, e.g.:
 claude mcp add burnish -- /path/to/burnish mcp
 ```
 
+### 4. Enforce style on every Claude Code turn (Stop hook)
+
+`burnish hook` is a Claude Code **Stop hook**: it runs when the assistant finishes
+a turn, checks the last (top-level) assistant message for **hard** style
+violations, and blocks the turn so Claude must revise. This is the deterministic
+guarantee that memory/instruction rules never had: the no-em-dash rule cannot be
+forgotten. It checks hard invariants only (a chat turn is a different register
+than a distilled profile), defaulting to the built-in base (em-dash / `--`), and
+**fails open** on any error so it can never wedge a session.
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": "burnish hook" } ] }
+    ]
+  }
+}
+```
+
+Point it at a register-appropriate profile to add that register's hard rules:
+`burnish hook --profile C:\path\to\paul-chat.profile.yaml` (or set
+`BURNISH_PROFILE`). On a violation it returns `{"decision":"block","reason":...}`
+naming the offending terms; a clean turn produces no output.
+
 ## What gets measured
 
 - **Length & cadence:** sentence-length mean and variance, paragraph length,
