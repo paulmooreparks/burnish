@@ -39,6 +39,15 @@ const (
 // authorship-attribution signal.
 const fwPrefix = "fw."
 
+// IsPer1kRate reports whether a metric id is a per-1000-word count rate. Such
+// estimates have high sampling variance on short drafts (one token in 50 words is
+// 20/1k), so lint widens their deviation scale by the draft's sampling error to
+// keep a single token from reading as a huge outlier. The cadence metrics are
+// per-100-lines, not per-1k words, so they are excluded.
+func IsPer1kRate(id string) bool {
+	return strings.HasPrefix(id, fwPrefix) || strings.HasSuffix(id, "_rate")
+}
+
 // functionWords is a fixed, ordered set of high-frequency function words whose
 // relative usage rates form a stylometric fingerprint largely independent of
 // topic. Kept modest; expand once the signal proves out.

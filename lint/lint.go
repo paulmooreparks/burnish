@@ -6,11 +6,13 @@
 package lint
 
 import (
+	"math"
 	"sort"
 	"strings"
 
 	"github.com/paulmooreparks/burnish/distill"
 	"github.com/paulmooreparks/burnish/internal/num"
+	"github.com/paulmooreparks/burnish/internal/text"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
 
@@ -28,7 +30,10 @@ type Result struct {
 	HardViolations int `json:"hard_violations"`
 	// OnTarget is the calibrated discriminator verdict: true when Distance is at
 	// or below the profile's discriminator threshold. Nil when the profile carries
-	// no calibrated discriminator.
+	// no calibrated discriminator. Note: for drafts much shorter than the corpus
+	// documents the distance is scored on a widened scale (sampling correction), so
+	// the verdict is a softer gate than the calibrated TPR/FPR, which describe
+	// document-scale text.
 	OnTarget *bool `json:"on_target,omitempty"`
 	// Threshold is the discriminator's acceptance threshold, when present.
 	Threshold *float64 `json:"threshold,omitempty"`
@@ -63,6 +68,14 @@ func Check(draft string, p *stylespec.Profile) (Result, error) {
 	}
 	var res Result
 	metrics := distill.Metrics(draft)
+	// Use the same token count the rates were normalized by (segmented words, as
+	// distill.Metrics does), so the sampling-variance correction matches the n the
+	// per-1k rates were actually computed at.
+	nWords := len(text.Segment(draft).AllWords())
+	var corpusDocWords float64
+	if p.Corpus.Documents > 0 {
+		corpusDocWords = float64(p.Corpus.Words) / float64(p.Corpus.Documents)
+	}
 
 	var weightedSum, weightTotal float64
 	for _, f := range p.Features {
@@ -71,7 +84,7 @@ func Check(draft string, p *stylespec.Profile) (Result, error) {
 			continue
 		}
 		weightTotal += f.Weight
-		dev := deviation(v, f.Target, f.Stddev)
+		dev := deviation(v, f.Target, scaleFor(f, nWords, corpusDocWords))
 		if dev <= 0 {
 			continue
 		}
@@ -113,11 +126,36 @@ func Check(draft string, p *stylespec.Profile) (Result, error) {
 	return res, nil
 }
 
+// scaleFor returns the deviation scale for a feature: the corpus stddev, widened
+// for per-1000-word rate features when the draft is shorter than the corpus
+// documents. A per-1k rate over n words has sampling variance ~ 1000*mean/n. The
+// corpus stddev already embeds that variance at the corpus's own document length,
+// so only the EXTRA variance from a shorter draft is added (in quadrature, and
+// never negative). corpusDocWords is the mean corpus document length, an
+// approximation of the per-document n the stddev embeds (exact only for
+// equal-length docs). At or above corpus-document length the scale is unchanged,
+// so a threshold calibrated on full documents stays valid; far below it, a single
+// token no longer reads as a large outlier.
+func scaleFor(f stylespec.Feature, nWords int, corpusDocWords float64) float64 {
+	if nWords <= 0 || !distill.IsPer1kRate(f.ID) {
+		return f.Stddev
+	}
+	draftVar := 1000.0 * f.Mean / float64(nWords)
+	var corpusVar float64
+	if corpusDocWords > 0 {
+		corpusVar = 1000.0 * f.Mean / corpusDocWords
+	}
+	extra := draftVar - corpusVar
+	if extra < 0 {
+		extra = 0
+	}
+	return math.Sqrt(f.Stddev*f.Stddev + extra)
+}
+
 // deviation returns how far value lies outside the target range, measured in
-// standard deviations. Returns 0 when in range. A zero stddev falls back to an
-// absolute deviation against epsilon so hard invariants (max 0) still register.
-func deviation(value float64, t stylespec.Target, stddev float64) float64 {
-	scale := stddev
+// scale units. Returns 0 when in range. A near-zero scale falls back to epsilon
+// so hard invariants (max 0) still register.
+func deviation(value float64, t stylespec.Target, scale float64) float64 {
 	if scale < epsilon {
 		scale = epsilon
 	}

@@ -129,11 +129,12 @@ Nothing is pushed yet.
 
 ## Known limits in the current skeleton (address as they bite)
 
-- **Function-word metrics are noisy on short drafts.** Per-1k-word rates
-  quantize hard below ~document scale: one "an" in a 50-word draft reads as 20+
-  stddev out. The signature is reliable at document scale, jittery at paragraph
-  scale. Options when it matters: length-gate the fw.* features, or report a
-  trimmed distance that drops sub-1-stddev noise. Not yet done.
+- ~~Function-word metrics noisy on short drafts~~ **[fixed, burnish-8]** via a
+  sampling-error widening of the deviation scale (`lint.scaleFor`): a per-1k rate
+  over n words has variance ~1000*mean/n, and the corpus stddev already embeds it
+  at corpus-doc length, so only the *extra* shortfall is added in quadrature. At
+  document scale unchanged (threshold stays valid); short drafts no longer let a
+  single token read as a 20-stddev outlier.
 - **Lexicon baseline is a small seed list** (~190 words, Zipf-modeled). Mid-
   frequency English words absent from it can score as distinctive. minDocs/
   minCount floors + the 3-char filter blunt it; a larger embedded baseline is
