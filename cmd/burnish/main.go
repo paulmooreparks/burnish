@@ -96,6 +96,7 @@ func cmdDistill(args []string) error {
 	language := fs.String("language", distill.DefaultLanguage, "corpus language code (only 'en' implemented)")
 	avoid := fs.String("avoid", "", "comma-separated terms this author avoids (hard violations), e.g. \"—,--\"")
 	base := fs.String("base", "", "path to a base profile to inherit (shared cross-register invariants)")
+	rulesFile := fs.String("rules-file", "", "YAML profile whose judged (LLM-induced) rules to merge in")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -125,17 +126,40 @@ func cmdDistill(args []string) error {
 		return err
 	}
 	prof.Rules = judge.Mine(docs, judge.DefaultMinSupport)
-	// Resolve inheritance once, after every field (including rules) is set, so the
-	// saved profile carries the author's base invariants and matches Load.
+	// Resolve inheritance after the deterministic rules are set, so the saved
+	// profile carries the author's base invariants and matches Load.
 	prof.Inherits = *base
 	if prof, err = stylespec.Resolve(prof, ""); err != nil {
 		return err
+	}
+	// Merge author-induced judged (subjective) rules AFTER Resolve, so the base
+	// merge cannot clobber them, deduped by id so they never collide with a mined
+	// or base rule. Load the carrier file raw (ignore any stray inherits).
+	nJudged := 0
+	if *rulesFile != "" {
+		rf, err := stylespec.LoadRaw(*rulesFile)
+		if err != nil {
+			return fmt.Errorf("rules-file: %w", err)
+		}
+		have := map[string]bool{}
+		for _, r := range prof.Rules {
+			have[r.ID] = true
+		}
+		for _, r := range judge.JudgedRules(rf.Rules) {
+			if have[r.ID] {
+				fmt.Fprintf(os.Stderr, "  warning: judged rule %q collides with an existing rule id; skipped\n", r.ID)
+				continue
+			}
+			have[r.ID] = true
+			prof.Rules = append(prof.Rules, r)
+			nJudged++
+		}
 	}
 	if err := prof.Save(outV); err != nil {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "distilled %d documents (%d words) -> %s\n", prof.Corpus.Documents, prof.Corpus.Words, outV)
-	fmt.Fprintf(os.Stderr, "  %d features, %d preferred lexicon terms, %d deterministic rules\n", len(prof.Features), len(prof.Lexicon.Preferred), len(prof.Rules))
+	fmt.Fprintf(os.Stderr, "  %d features, %d preferred lexicon terms, %d deterministic rules, %d judged rules\n", len(prof.Features), len(prof.Lexicon.Preferred), len(prof.Rules)-nJudged, nJudged)
 	if prof.Corpus.Documents < 5 {
 		fmt.Fprintf(os.Stderr, "  warning: thin corpus (%d docs); target ranges are low-confidence\n", prof.Corpus.Documents)
 	}

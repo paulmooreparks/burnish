@@ -334,11 +334,14 @@ deterministic skeleton comes first.
    `style_review`. First measured result: authentic-essay vs AI-technical-prose
    AUC ~0.80. The calibrated LLM judge is the upgrade, reusing this same
    held-out-vs-decoys protocol with the caller's inference.
-5. **[done, first cut]** Rule mining (`judge/`), deterministic: mine per-instance
-   structural rules (max sentence/paragraph length) with corpus-validated support,
-   attach to the profile, and flag violations the aggregate distance hides (a lone
-   run-on). Wired into `score` and `style_review`. The LLM-induced *subjective*
-   rules + judging payload (validated rules + evidence ask) are the upgrade.
+5. **[done]** Rule mining (`judge/`). Deterministic: per-instance structural
+   rules (max sentence/paragraph length) with corpus-validated support, flagged
+   against a draft. LLM-judged (subjective): `InductionPrompt` proposes candidate
+   style rules from corpus samples (the caller's LLM renders it; validated against
+   the corpus, kept with high support), stored as `class: judged` and merged into
+   a profile via `distill --rules-file`; `JudgingPrompt` evaluates a draft against
+   them with required evidence. style_review hands the agent the judging payload.
+   Both bake no model. (A first set was induced for the essay corpus in-session.)
 6. **[done, first cut]** Exemplar retrieval (`retrieve/`), deterministic: a
    TF-IDF cosine bank over corpus chunks (`burnish retrieve`), returning
    topically-relevant authentic-style passages as few-shot, no embedding model.

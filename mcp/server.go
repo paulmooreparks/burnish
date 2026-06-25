@@ -156,6 +156,7 @@ type reviewResult struct {
 	AvoidedLexicon   []string                `json:"avoided_lexicon,omitempty"`
 	Rules            []stylespec.Rule        `json:"rules,omitempty"`
 	RuleViolations   []judge.RuleViolation   `json:"rule_violations,omitempty"`
+	JudgingPrompt    string                  `json:"judging_prompt,omitempty"`
 	Judgement        string                  `json:"judgement"`
 	Guidance         string                  `json:"guidance"`
 }
@@ -174,6 +175,10 @@ func handleStyleReview(ctx context.Context, _ *sdk.CallToolRequest, a reviewArgs
 		}
 	}
 	rv := judge.CheckRules(a.Text, prof.Rules)
+	var judgingPrompt string
+	if len(judge.JudgedRules(prof.Rules)) > 0 {
+		judgingPrompt = judge.JudgingPrompt(a.Text, prof.Rules)
+	}
 	rev := reviewResult{
 		Distance:         res.Distance,
 		OnTarget:         res.OnTarget,
@@ -185,12 +190,13 @@ func handleStyleReview(ctx context.Context, _ *sdk.CallToolRequest, a reviewArgs
 		AvoidedLexicon:   prof.Lexicon.Avoided,
 		Rules:            prof.Rules,
 		RuleViolations:   rv,
+		JudgingPrompt:    judgingPrompt,
 		Judgement:        judgement,
 		Guidance: "Revise the draft to bring the off-target features into range, remove avoided terms, favor the " +
 			"preferred lexicon, and fix the listed deterministic rule_violations. The deterministic discriminator " +
-			"gives a distance-threshold verdict and the deterministic rules are checked here; the richer LLM-judged " +
-			"subjective rules are not built yet. When you judge, do it in a FRESH, ISOLATED context (a separate " +
-			"subagent or invocation), never the one that wrote the draft.",
+			"gives a distance-threshold verdict and the deterministic rules are checked here; for the subjective " +
+			"judged rules, run judging_prompt yourself. Judge in a FRESH, ISOLATED context (a separate subagent or " +
+			"invocation), never the one that wrote the draft.",
 	}
 	return textResult(reviewSummary(prof, res)+ruleSummary(rv), rev)
 }

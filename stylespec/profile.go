@@ -220,6 +220,11 @@ func loadRaw(path string) (*Profile, error) {
 	return &p, nil
 }
 
+// LoadRaw reads a profile from YAML WITHOUT resolving inheritance. Use it for a
+// flat carrier file (e.g. a judged-rules file) where the contents should be taken
+// verbatim and any stray `inherits` ignored, not followed.
+func LoadRaw(path string) (*Profile, error) { return loadRaw(path) }
+
 // Load reads a profile and resolves its inheritance (merge-at-load-time), so
 // every consumer sees one fully-resolved profile with the base invariants
 // applied. The base is resolved relative to the profile's directory.
