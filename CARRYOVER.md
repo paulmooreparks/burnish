@@ -103,16 +103,17 @@ it is the source of truth for what's next. Board column design and the cards
 
 Done so far: walking skeleton, `score`, multi-language groundwork, rename to
 burnish, Ctrl-Shift-B build task, **authentic essay corpus** (burnish-1), the
-**MCP server**, and the **calibrated deterministic-distance discriminator**
-(burnish-2: `burnish calibrate`, AUC 0.80 authentic-vs-AI, on-target verdict in
-`score`/MCP).
+**MCP server**, the **calibrated deterministic-distance discriminator** (burnish-2:
+`burnish calibrate`, AUC 0.80, on-target verdict in `score`/MCP), and the
+**deterministic corpus-validated rule layer** (burnish-3: `judge.Mine`/`CheckRules`,
+catches per-instance run-ons the aggregate hides). Shared `internal/num` helper.
 
 Immediate next (board `now`/`next`):
-1. **burnish-3 Corpus-validated rule mining** (`judge/` payload): induce rules
-   from the corpus, validate each back against it (keep only high-support),
-   require evidence; wire into `style_review`.
-2. **burnish-9 Base profile + register inheritance**: move the em-dash invariant
+1. **burnish-9 Base profile + register inheritance**: move the em-dash invariant
    out of the inline bake into a real shared base profile + merge step.
+2. **burnish-11 LLM-induced subjective style rules** (spawned from burnish-3, the
+   judged-rule upgrade): induction + judging payload, validated against corpus,
+   caller's LLM renders judgement with evidence.
 3. **burnish-8 Short-draft function-word noise** and **burnish-4 Exemplar
    retrieval**, then **burnish-5 massage loop** (`enforce/`, blocked on judge +
    retrieve; discriminate now done), the **Stop hook** (burnish-6), and the
