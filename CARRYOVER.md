@@ -112,15 +112,17 @@ catches per-instance run-ons the aggregate hides). Shared `internal/num` helper.
 -> judge(rules) -> retrieve -> massage loop (`enforce.Massage`), exposed via
 `pkg/api` and the MCP server. The revise step is the caller's LLM.
 
-Remaining (board), all either delivery surfaces or LLM upgrades:
-1. **burnish-6 Claude Code Stop hook**: the push-enforcement wrapper that execs
-   the engine against the last turn and blocks on hard violations. The deterministic
-   check already exists (`score` exit code); this wires it as a hook.
-2. **burnish-7 `model/` adapter + `serve`**: the headless inference path (Reviser
+Remaining (board). The whole engine + all no-API surfaces are done and PUSHED
+(distill, score, discriminate, judge, retrieve, massage loop, MCP server, Stop
+hook, pkg/api). What's left needs either the Anthropic API or is minor:
+1. **burnish-7 `model/` adapter + `serve`**: the headless inference path (Reviser
    + judge/discriminator for agent-less callers) and the HTTP sidecar for .NET.
-   First real Anthropic-API wiring.
-3. **burnish-11 LLM-induced subjective rules** (judged-rule upgrade), **burnish-10
-   larger lexicon baseline** (minimal). Dense embeddings for retrieval whenever.
+   This is the FIRST real Anthropic-API wiring (key handling, model choice, cost);
+   worth confirming the approach with Paul before building.
+2. **burnish-11 LLM-induced subjective rules** (judged-rule upgrade; also needs
+   the API or an in-session agent as the inducer/judge).
+3. **burnish-10 larger lexicon baseline** (minimal, no API). Dense embeddings for
+   retrieval whenever.
 
 Repo hygiene: repo is **public**; profiles are gitignored user data, never
 committed. Local history was re-rooted onto the real initial commit, so
