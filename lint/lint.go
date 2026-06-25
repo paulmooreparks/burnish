@@ -26,6 +26,12 @@ type Result struct {
 	Lexical []LexicalViolation `json:"lexical,omitempty"`
 	// HardViolations counts violations that must block (e.g. em-dash present).
 	HardViolations int `json:"hard_violations"`
+	// OnTarget is the calibrated discriminator verdict: true when Distance is at
+	// or below the profile's discriminator threshold. Nil when the profile carries
+	// no calibrated discriminator.
+	OnTarget *bool `json:"on_target,omitempty"`
+	// Threshold is the discriminator's acceptance threshold, when present.
+	Threshold *float64 `json:"threshold,omitempty"`
 }
 
 // FeatureViolation is one out-of-range statistical feature.
@@ -97,6 +103,13 @@ func Check(draft string, p *stylespec.Profile) (Result, error) {
 
 	res.Lexical = findAvoided(draft, p.Lexicon.Avoided)
 	res.HardViolations += len(res.Lexical)
+
+	if p.Discriminator != nil {
+		t := p.Discriminator.Threshold
+		onTarget := res.Distance <= t
+		res.OnTarget = &onTarget
+		res.Threshold = &t
+	}
 	return res, nil
 }
 

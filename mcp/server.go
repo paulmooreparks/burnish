@@ -139,15 +139,17 @@ type reviewArgs struct {
 }
 
 type reviewResult struct {
-	Distance         float64                  `json:"distance"`
-	HardViolations   int                      `json:"hard_violations"`
-	Features         []lint.FeatureViolation  `json:"features,omitempty"`
-	Lexical          []lint.LexicalViolation  `json:"lexical,omitempty"`
-	PreferredLexicon []string                 `json:"preferred_lexicon,omitempty"`
-	AvoidedLexicon   []string                 `json:"avoided_lexicon,omitempty"`
-	Rules            []stylespec.Rule         `json:"rules,omitempty"`
-	Judgement        string                   `json:"judgement"`
-	Guidance         string                   `json:"guidance"`
+	Distance         float64                 `json:"distance"`
+	OnTarget         *bool                   `json:"on_target,omitempty"`
+	Threshold        *float64                `json:"threshold,omitempty"`
+	HardViolations   int                     `json:"hard_violations"`
+	Features         []lint.FeatureViolation `json:"features,omitempty"`
+	Lexical          []lint.LexicalViolation `json:"lexical,omitempty"`
+	PreferredLexicon []string                `json:"preferred_lexicon,omitempty"`
+	AvoidedLexicon   []string                `json:"avoided_lexicon,omitempty"`
+	Rules            []stylespec.Rule        `json:"rules,omitempty"`
+	Judgement        string                  `json:"judgement"`
+	Guidance         string                  `json:"guidance"`
 }
 
 func handleStyleReview(ctx context.Context, _ *sdk.CallToolRequest, a reviewArgs) (*sdk.CallToolResult, reviewResult, error) {
@@ -155,18 +157,29 @@ func handleStyleReview(ctx context.Context, _ *sdk.CallToolRequest, a reviewArgs
 	if err != nil {
 		return errResult[reviewResult](err.Error())
 	}
+	judgement := "no calibrated discriminator on this profile; render judgement yourself"
+	if res.OnTarget != nil {
+		if *res.OnTarget {
+			judgement = "deterministic discriminator: ON-TARGET (distance within calibrated threshold)"
+		} else {
+			judgement = "deterministic discriminator: OFF-TARGET (distance exceeds calibrated threshold)"
+		}
+	}
 	rev := reviewResult{
 		Distance:         res.Distance,
+		OnTarget:         res.OnTarget,
+		Threshold:        res.Threshold,
 		HardViolations:   res.HardViolations,
 		Features:         res.Features,
 		Lexical:          res.Lexical,
 		PreferredLexicon: prof.Lexicon.Preferred,
 		AvoidedLexicon:   prof.Lexicon.Avoided,
 		Rules:            prof.Rules,
-		Judgement:        "not-yet-available: the rule judge and calibrated discriminator are not built; render judgement yourself",
+		Judgement:        judgement,
 		Guidance: "Revise the draft to bring the off-target features into range and remove avoided terms, " +
-			"favoring the preferred lexicon. Then judge whether it now reads like the target corpus in a " +
-			"FRESH, ISOLATED context (a separate subagent or invocation), never the one that wrote it.",
+			"favoring the preferred lexicon. The deterministic discriminator gives a distance-threshold verdict; " +
+			"the richer rule-based LLM judgement is not built yet. When you judge, do it in a FRESH, ISOLATED " +
+			"context (a separate subagent or invocation), never the one that wrote the draft.",
 	}
 	return textResult(reviewSummary(prof, res), rev)
 }
@@ -192,6 +205,13 @@ func scoreSummary(p *stylespec.Profile, res lint.Result) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "profile: %s (register %s, language %s)\n", p.ID, p.Register, p.Language)
 	fmt.Fprintf(&b, "distance to style: %.3f stddev (0 = within all target ranges)\n", res.Distance)
+	if res.OnTarget != nil {
+		verdict := "OFF-TARGET"
+		if *res.OnTarget {
+			verdict = "ON-TARGET"
+		}
+		fmt.Fprintf(&b, "discriminator: %s (distance %.3f vs threshold %.3f)\n", verdict, res.Distance, *res.Threshold)
+	}
 	if res.HardViolations > 0 {
 		fmt.Fprintf(&b, "HARD violations: %d\n", res.HardViolations)
 	}

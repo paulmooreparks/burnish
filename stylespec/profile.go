@@ -79,10 +79,15 @@ type Exemplars struct {
 	Index string `yaml:"index"`
 }
 
-// Discriminator holds the calibrated acceptance gate.
+// Discriminator holds the calibrated acceptance gate: a draft is on-target when
+// its deterministic distance is at or below Threshold. AUC, TPR, and FPR record
+// how well the calibration separated held-out target text from off-style decoys.
 type Discriminator struct {
-	Threshold   float64 `yaml:"threshold"`
-	Calibration string  `yaml:"calibration"`
+	Threshold float64 `yaml:"threshold"`
+	AUC       float64 `yaml:"auc,omitempty"`
+	TPR       float64 `yaml:"tpr,omitempty"`
+	FPR       float64 `yaml:"fpr,omitempty"`
+	Method    string  `yaml:"method,omitempty"` // e.g. "distance-threshold"
 }
 
 // CorpusStats is distillation provenance.

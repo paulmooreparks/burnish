@@ -262,12 +262,15 @@ self-sufficient. This is a fallback, not the default path.
    library, expose through hook and callable. (Chosen over building per-surface.)
 3. **Both layers from the start.** Deterministic linter *and* isolated LLM judge;
    the rule mix is an even split of mechanical and subjective.
-4. **Discriminator: calibrated judge first**, not a trained classifier. The
-   calibration (held-out target + generic-LLM decoys + threshold) is deterministic
-   engine work and stays in `discriminate/`; only the per-draft judgement needs a
-   model. Upgrade path: fine-tune a small on-corpus classifier for cheap
-   deterministic scoring once a corpus is large enough. *(Amended: the engine owns
-   calibration and protocol, not the inference; see #5.)*
+4. **Discriminator: calibrated *deterministic distance threshold* first** (built),
+   not an LLM judge and not even a trained classifier. The calibration (held-out
+   target + decoys + Youden-J threshold + AUC) is pure engine work in
+   `discriminate/`; the score is the distance `lint` already computes, so the
+   runtime gate needs no model at all. This inverts the original "LLM judge first"
+   plan and fits the deterministic-first thesis. Upgrade path: a richer score (a
+   trained on-corpus classifier, then the calibrated LLM judge) reusing the same
+   held-out-vs-decoys protocol; only that per-draft judgement needs a model, and it
+   runs in the caller (#5).
 5. **Inference runs in the caller, not the binary.** *(Supersedes the original
    "bake in Haiku 4.5" decision.)* In the agentic path the calling agent is
    already a capable LLM; having the tool shell out to a second, weaker model for
@@ -304,9 +307,16 @@ deterministic skeleton comes first.
    plus the profile's lexicon/rules as a revision payload, with judgement marked
    not-yet-available. The agentic surface; needs no model. Run via
    `burnish mcp`.
-4. `discriminate/` **calibration**: hold out target doc text vs. generic-LLM
-   decoys, compute the threshold, and emit the scoring rubric. Inference is the
-   caller's (or the `model/` adapter for headless); the engine owns the protocol.
+4. **[done]** `discriminate/` **calibration**, first cut as a *deterministic
+   distance threshold* (no model): split target into train/holdout, build the
+   profile from train, score held-out target vs decoys, derive a Youden-J
+   threshold + AUC/TPR/FPR, and ship the train profile carrying the gate (same
+   distance scale the threshold was measured on, so the reported FPR describes the
+   shipped artifact). A non-separating corpus is flagged, not silently shipped.
+   `burnish calibrate`; the on-target verdict surfaces in `score` and
+   `style_review`. First measured result: authentic-essay vs AI-technical-prose
+   AUC ~0.80. The calibrated LLM judge is the upgrade, reusing this same
+   held-out-vs-decoys protocol with the caller's inference.
 5. Rule mining + `judge/` payload (validated rules + evidence ask), wired into
    `style_review`.
 6. Exemplar retrieval (`retrieve/`), then the full massage loop (`enforce/`),

@@ -5,11 +5,12 @@
 // decoys, so "indistinguishable" means indistinguishable from held-out target
 // text, not circular self-agreement (DESIGN.md sections 2, 5, 8).
 //
-// It owns calibration and the scoring rubric, not the inference. In the agentic
-// path the caller's LLM renders the judgement in a fresh, isolated context (never
-// grading its own draft, DESIGN.md section 7 constraint 1); the headless model/
-// adapter runs it only for agent-less callers.
+// First cut (implemented): a calibrated threshold over the deterministic distance
+// that lint already computes, with no model in the loop. Calibrate holds out part
+// of the target corpus, scores it and the decoys, and derives a threshold plus
+// separation metrics (AUC, TPR, FPR). See calibrate.go.
 //
-// Not yet implemented. Starts as a calibrated LLM judge; upgrade path is a
-// trained on-corpus classifier once the corpus is large enough.
+// Upgrade path: a calibrated LLM judge renders the on-target score in a fresh,
+// isolated context (the caller's LLM in the agentic path; the headless model/
+// adapter otherwise), reusing the same held-out-target-vs-decoys protocol.
 package discriminate
