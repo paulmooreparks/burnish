@@ -108,19 +108,20 @@ burnish, Ctrl-Shift-B build task, **authentic essay corpus** (burnish-1), the
 **deterministic corpus-validated rule layer** (burnish-3: `judge.Mine`/`CheckRules`,
 catches per-instance run-ons the aggregate hides). Shared `internal/num` helper.
 
-Immediate next (board `now`/`next`):
-1. **burnish-8 Short-draft function-word noise** (workhorse) and **burnish-4
-   Exemplar retrieval** (`retrieve/`, embedding bank).
-2. **burnish-11 LLM-induced subjective style rules** (spawned from burnish-3, the
-   judged-rule upgrade): induction + judging payload, validated against corpus,
-   caller's LLM renders judgement with evidence.
-3. Then **burnish-5 massage loop** (`enforce/`, blocked on judge + retrieve;
-   discriminate now done), the **Stop hook** (burnish-6), and the `model/` adapter
-   + `serve` (burnish-7). burnish-10 (larger lexicon baseline) any time.
+Immediate next (board):
+1. **burnish-5 massage loop** (`enforce/`) is now UNBLOCKED (discriminate +
+   judge + retrieve all Done). It ties the engine together: lint -> judge ->
+   retrieve -> discriminate -> revise, bounded N=2-3. The deterministic stages all
+   exist; the revise step is the caller's LLM (consolidate a revision brief +
+   loop control, like style_review as a bounded loop). This is the capstone of
+   the agentic path.
+2. **burnish-11 LLM-induced subjective style rules** (judged-rule upgrade),
+   **burnish-10 larger lexicon baseline** (minimal), then the **Stop hook**
+   (burnish-6) and the `model/` adapter + `serve` (burnish-7).
 
-Done since: **burnish-9 base profile + register inheritance** (`stylespec.Merge`/
-`Resolve`, built-in base, load-time merge; em-dash moved from the inline bake to
-the base's avoided lexicon).
+The deterministic-first cuts are essentially complete: distill, score, MCP,
+discriminator, rules, inheritance, short-draft fix, retrieval. What remains is
+mostly the massage-loop orchestration and the LLM-rendered upgrades.
 
 Repo hygiene: repo is **public**; profiles are gitignored user data, never
 committed. Local history was re-rooted onto the real initial commit, so
