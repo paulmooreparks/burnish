@@ -23,12 +23,14 @@ The full **deterministic, no-model engine is built** and exercised end to end:
 - the **massage loop** (`enforce`/`pkg/api`): lint -> judge -> retrieve ->
   discriminate -> revise, bounded
 - an **MCP server** (the primary agentic surface) and a **Claude Code Stop hook**
+- a headless **`model/` adapter** (a stdlib-only Anthropic Messages client) and a
+  Fielding-style **`serve`** HTTP API, for agent-less callers (.NET sidecar, CI)
 
 The architecture keeps inference in the **caller**: the deterministic stages need
 no model, and the revise/judge steps are rendered by the calling agent's LLM (the
-agentic path), so the engine bakes no API key. The remaining pieces are the
-headless **`model/` adapter** and the **`serve`** HTTP sidecar (for agent-less
-.NET callers), which are the only parts that wire an LLM API directly.
+agentic path), so the engine bakes no API key. The optional `model/` adapter wires
+an LLM API directly, but only as the headless fallback, and `serve` exposes the
+massage action only when an API key is configured.
 
 ## Build
 
@@ -189,11 +191,36 @@ em-dashes on every turn, add to `~/.claude/settings.json`:
 On a violation it returns `{"decision":"block","reason":...}` naming the offending
 terms; a clean turn produces no output.
 
+### 7. Serve the engine over HTTP (headless callers)
+
+```
+burnish serve --profiles ./profiles [--addr :8080] [--model NAME]
+```
+
+For agent-less callers (a .NET sidecar, CI) there is no orchestrating LLM, so
+`serve` exposes the engine as a **Fielding-style (HATEOAS) REST API**. It loads
+every `*.profile.yaml` under `--profiles` and is hypermedia-driven: start at `/`
+and follow `_links` to a profile, then POST a draft to its `assessments` or
+`reviews` collection (each returns `201` + a `Location` you can GET back).
+
+The **massage** action needs an LLM. If `ANTHROPIC_API_KEY` is set, `serve` wires
+the built-in `model/` adapter (a stdlib-only Anthropic Messages client; `--model`
+defaults to Haiku) and the `massages` link appears on every profile. Without a key
+that link is simply **absent** from the representation (illegal actions are not
+advertised), and a direct POST gets `405` with `"reason":"no_reviser"`.
+
+```
+curl -s localhost:8080/profiles/me                      # see the available actions
+curl -s -XPOST localhost:8080/profiles/me/reviews -d '{"text":"my draft"}'
+```
+
 ### As a Go library
 
 `pkg/api` exposes `LoadProfile`, `Check` (deterministic assessment), `BuildBank`,
 and `Massage` (the bounded loop, taking your LLM as the `Reviser`) for apps that
-wrap their own LLM calls.
+wrap their own LLM calls. The `model` package provides a ready-made `Reviser`
+(`model.NewClient(key).Reviser()`) for headless callers that want the built-in
+adapter instead of their own LLM.
 
 ## What gets measured
 

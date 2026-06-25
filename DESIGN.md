@@ -356,8 +356,17 @@ deterministic skeleton comes first.
    guarantee. Reads the stop payload, extracts the last top-level assistant turn
    (skipping subagent sidechains), and blocks the stop on hard violations so Claude
    revises. Hard-invariants-only against the base by default (zero config), fails
-   open. Remaining: the `model/` headless adapter + `serve` mode (first real
-   Anthropic-API wiring).
+   open.
+9. **[done, build + mock]** The headless fallback: `model/` adapter + `serve`
+   mode. `model/` is a stdlib-only Anthropic Messages client (injectable HTTP
+   doer, no SDK dependency) exposing a `Reviser` for the massage loop and a
+   `JudgeRules` verdict call; the engine still bakes no model (decision #5), and
+   `model/` is constructed only by `serve`/CLI. `serve` is a Fielding-style
+   (HATEOAS) HTTP REST API over the engine: hypermedia representations with
+   `_links`, link-driven reachability from `/`, and the massage action absent
+   from a profile unless a reviser is configured. Tested entirely against a
+   mocked transport + stub reviser; no live API call. Live smoke test +
+   judged-rules-in-the-massage-loop wiring are follow-ups.
 
 Steps 1-2 (the deterministic walking skeleton) are already useful standalone:
 point `score` at any draft and see how far from the target voice it sits.

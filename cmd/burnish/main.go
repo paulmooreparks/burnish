@@ -4,9 +4,9 @@
 //	score      measure a draft's distance from a profile's target style
 //	calibrate  derive a discriminator threshold from target vs decoy corpora
 //	mcp        run the MCP server (stdio) exposing distill/score/style_review
+//	serve      run the headless HTTP REST API (Fielding-style) for .NET/CI callers
 //
-// The judge, retrieval, full massage loop, and the Claude Code Stop hook are
-// later increments. See DESIGN.md.
+// See DESIGN.md.
 package main
 
 import (
@@ -23,7 +23,9 @@ import (
 	"github.com/paulmooreparks/burnish/judge"
 	"github.com/paulmooreparks/burnish/lint"
 	bpmcp "github.com/paulmooreparks/burnish/mcp"
+	"github.com/paulmooreparks/burnish/model"
 	"github.com/paulmooreparks/burnish/retrieve"
+	"github.com/paulmooreparks/burnish/serve"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
 
@@ -46,6 +48,8 @@ func main() {
 		err = cmdHook(os.Args[2:])
 	case "mcp":
 		err = bpmcp.Serve(context.Background())
+	case "serve":
+		err = cmdServe(os.Args[2:])
 	case "-h", "--help", "help":
 		usage()
 		return
@@ -70,6 +74,7 @@ usage:
   burnish retrieve  --corpus DIR --query TEXT [-k N] [--min-words N]
   burnish hook      [--avoid "—,--"] [--profile FILE]
   burnish mcp
+  burnish serve     --profiles DIR [--addr :8080] [--model NAME]
 
   --avoid lists terms this author avoids (hard violations); burnish imposes no
   universal avoidance. --base inherits a shared base profile (cross-register
@@ -84,7 +89,40 @@ usage:
   score reads the draft from FILE or, if omitted, from stdin.
   Add --json to score for machine-readable output.
   mcp runs the MCP server over stdio (distill, score, style_review tools).
+  serve runs the headless HTTP REST API (Fielding-style/HATEOAS) over the engine
+  for agent-less callers (.NET sidecar, CI). It loads every *.profile.yaml under
+  --profiles. If ANTHROPIC_API_KEY is set it also offers the massage action via the
+  built-in model adapter (--model, default `+model.DefaultModel+`); without a key
+  the massage action is simply absent from the API.
 `)
+}
+
+func cmdServe(args []string) error {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	profilesDir := fs.String("profiles", "", "directory of *.profile.yaml files to serve")
+	addr := fs.String("addr", ":8080", "listen address")
+	modelName := fs.String("model", model.DefaultModel, "Anthropic model for the massage action (used only if ANTHROPIC_API_KEY is set)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *profilesDir == "" {
+		return fmt.Errorf("serve requires --profiles")
+	}
+	profiles, err := serve.LoadProfiles(*profilesDir)
+	if err != nil {
+		return err
+	}
+	if len(profiles) == 0 {
+		return fmt.Errorf("no *.profile.yaml files under %s", *profilesDir)
+	}
+
+	opts := serve.Options{Profiles: profiles}
+	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
+		mc := model.NewClient(key)
+		mc.Model = *modelName
+		opts.Reviser = mc.Reviser()
+	}
+	return serve.New(opts).ListenAndServe(context.Background(), *addr)
 }
 
 func cmdDistill(args []string) error {
