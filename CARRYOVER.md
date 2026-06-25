@@ -109,15 +109,18 @@ burnish, Ctrl-Shift-B build task, **authentic essay corpus** (burnish-1), the
 catches per-instance run-ons the aggregate hides). Shared `internal/num` helper.
 
 Immediate next (board `now`/`next`):
-1. **burnish-9 Base profile + register inheritance**: move the em-dash invariant
-   out of the inline bake into a real shared base profile + merge step.
+1. **burnish-8 Short-draft function-word noise** (workhorse) and **burnish-4
+   Exemplar retrieval** (`retrieve/`, embedding bank).
 2. **burnish-11 LLM-induced subjective style rules** (spawned from burnish-3, the
    judged-rule upgrade): induction + judging payload, validated against corpus,
    caller's LLM renders judgement with evidence.
-3. **burnish-8 Short-draft function-word noise** and **burnish-4 Exemplar
-   retrieval**, then **burnish-5 massage loop** (`enforce/`, blocked on judge +
-   retrieve; discriminate now done), the **Stop hook** (burnish-6), and the
-   `model/` adapter + `serve` (burnish-7).
+3. Then **burnish-5 massage loop** (`enforce/`, blocked on judge + retrieve;
+   discriminate now done), the **Stop hook** (burnish-6), and the `model/` adapter
+   + `serve` (burnish-7). burnish-10 (larger lexicon baseline) any time.
+
+Done since: **burnish-9 base profile + register inheritance** (`stylespec.Merge`/
+`Resolve`, built-in base, load-time merge; em-dash moved from the inline bake to
+the base's avoided lexicon).
 
 Repo hygiene: repo is **public**; profiles are gitignored user data, never
 committed. Local history was re-rooted onto the real initial commit, so
@@ -144,9 +147,9 @@ Nothing is pushed yet.
 ## Open questions parked for later
 
 - Embedding model + vector store for the exemplar bank (`retrieve/`).
-- Concrete profile file format (YAML sketched in DESIGN.md section 3; firm up when
-  `stylespec/` is written).
-- Whether the base/inherited-profile merge is static (at load) or layered (at
-  check time).
 - Threshold-tuning UX: how Paul inspects and adjusts feature weights and the
   discriminator threshold.
+
+(Resolved: profile file format is the implemented `stylespec` YAML; base/inherit
+merge is **load-time**, base-wins, built-in base = the avoided-lexicon em-dash
+invariant.)

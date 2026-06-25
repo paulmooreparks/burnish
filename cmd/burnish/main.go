@@ -105,6 +105,11 @@ func cmdDistill(args []string) error {
 		return err
 	}
 	prof.Rules = judge.Mine(docs, judge.DefaultMinSupport)
+	// Resolve inheritance once, after every field (including rules) is set, so the
+	// saved profile carries the base invariants and matches what Load produces.
+	if prof, err = stylespec.Resolve(prof, ""); err != nil {
+		return err
+	}
 	if err := prof.Save(outV); err != nil {
 		return err
 	}
@@ -215,6 +220,9 @@ func cmdCalibrate(args []string) error {
 		return err
 	}
 	prof.Rules = judge.Mine(targetDocs, judge.DefaultMinSupport)
+	if prof, err = stylespec.Resolve(prof, ""); err != nil {
+		return err
+	}
 	if err := prof.Save(outV); err != nil {
 		return err
 	}

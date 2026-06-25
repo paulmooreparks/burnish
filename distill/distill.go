@@ -61,11 +61,14 @@ type Options struct {
 	LexiconTopN     int
 	LexiconMinCount int
 	LexiconMinDocs  int
+	// Base names the profile the result inherits (cross-register invariants);
+	// "base" is the built-in. Empty disables inheritance. Default "base".
+	Base string
 }
 
 // DefaultOptions returns sensible distillation defaults.
 func DefaultOptions() Options {
-	return Options{RangeK: 1.5, LexiconTopN: 40, LexiconMinCount: 3, LexiconMinDocs: 2}
+	return Options{RangeK: 1.5, LexiconTopN: 40, LexiconMinCount: 3, LexiconMinDocs: 2, Base: stylespec.BaseProfileID}
 }
 
 // Distill builds a Profile from a single-register corpus in the given language.
@@ -121,17 +124,17 @@ func Distill(id, register, language string, docs []DocInput, opts Options) (*sty
 		prof.Features = append(prof.Features, f)
 	}
 
-	// Bake the cross-register em-dash invariant (DESIGN.md section 4): regardless
-	// of what the corpus shows, em-dashes are a hard zero. This belongs in a base
-	// profile once inheritance is implemented; for now it is enforced inline.
-	setHardInvariant(prof, MEmDashRate)
-
 	lex := MineLexicon(texts, opts.LexiconTopN, opts.LexiconMinCount, opts.LexiconMinDocs)
 	for _, l := range lex {
 		prof.Lexicon.Preferred = append(prof.Lexicon.Preferred, l.Term)
 	}
-	prof.Lexicon.Avoided = []string{"—", "--"}
 
+	// Record the inherited base (cross-register invariants, DESIGN.md section 4).
+	// Distill does NOT resolve it here: rule mining happens after Distill returns
+	// (outside this package, to avoid a distill<->judge import cycle), so the
+	// caller resolves once after attaching rules, via stylespec.Resolve. Resolving
+	// here would be undone by a later prof.Rules assignment.
+	prof.Inherits = opts.Base
 	return prof, nil
 }
 
@@ -156,19 +159,6 @@ func weightFor(id string, mean, std float64) float64 {
 	default:
 		return num.Round(w, 3)
 	}
-}
-
-func setHardInvariant(p *stylespec.Profile, id string) {
-	for i := range p.Features {
-		if p.Features[i].ID == id {
-			p.Features[i].Target = stylespec.Target{Max: stylespec.Ptr(0)}
-			p.Features[i].Weight = 1.0
-			return
-		}
-	}
-	p.Features = append(p.Features, stylespec.Feature{
-		ID: id, Target: stylespec.Target{Max: stylespec.Ptr(0)}, Weight: 1.0,
-	})
 }
 
 // isNonNegative reports whether a metric is a rate/count that cannot go below

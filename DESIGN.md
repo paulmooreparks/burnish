@@ -128,6 +128,18 @@ matches none. Therefore:
   recommendation-first) live in a **base profile** that every register inherits and
   extends. Paul's existing CLAUDE.md style rules are mostly this base.
 
+**Inheritance is implemented (merge at load time).** A profile's `inherits` field
+names a base (the built-in `base`, or a file path). `stylespec.Resolve` merges it,
+and `Load` resolves so every consumer sees one fully-resolved profile; `distill`
+sets `inherits: base` and the CLI resolves after rules are mined. The base **wins**
+on any conflict, so a register cannot relax an invariant. The decision of *load
+time vs check time* is settled: load time (with `distill` pre-resolving in memory),
+because it keeps every downstream package base-unaware and the merge is idempotent.
+The only invariant today is the no-em-dash rule, now expressed as the base's
+**avoided-lexicon** entry (the hard lexical check enforces it) rather than an inline
+`max: 0` feature; new invariants (e.g. a base judged rule) are added to
+`stylespec.BaseProfile`, never baked into the distiller.
+
 ## 5. The two pipelines
 
 ### Distill (offline): corpus -> profile
