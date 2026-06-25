@@ -108,20 +108,19 @@ burnish, Ctrl-Shift-B build task, **authentic essay corpus** (burnish-1), the
 **deterministic corpus-validated rule layer** (burnish-3: `judge.Mine`/`CheckRules`,
 catches per-instance run-ons the aggregate hides). Shared `internal/num` helper.
 
-Immediate next (board):
-1. **burnish-5 massage loop** (`enforce/`) is now UNBLOCKED (discriminate +
-   judge + retrieve all Done). It ties the engine together: lint -> judge ->
-   retrieve -> discriminate -> revise, bounded N=2-3. The deterministic stages all
-   exist; the revise step is the caller's LLM (consolidate a revision brief +
-   loop control, like style_review as a bounded loop). This is the capstone of
-   the agentic path.
-2. **burnish-11 LLM-induced subjective style rules** (judged-rule upgrade),
-   **burnish-10 larger lexicon baseline** (minimal), then the **Stop hook**
-   (burnish-6) and the `model/` adapter + `serve` (burnish-7).
+**The agentic engine is complete end to end**: distill -> score -> discriminate
+-> judge(rules) -> retrieve -> massage loop (`enforce.Massage`), exposed via
+`pkg/api` and the MCP server. The revise step is the caller's LLM.
 
-The deterministic-first cuts are essentially complete: distill, score, MCP,
-discriminator, rules, inheritance, short-draft fix, retrieval. What remains is
-mostly the massage-loop orchestration and the LLM-rendered upgrades.
+Remaining (board), all either delivery surfaces or LLM upgrades:
+1. **burnish-6 Claude Code Stop hook**: the push-enforcement wrapper that execs
+   the engine against the last turn and blocks on hard violations. The deterministic
+   check already exists (`score` exit code); this wires it as a hook.
+2. **burnish-7 `model/` adapter + `serve`**: the headless inference path (Reviser
+   + judge/discriminator for agent-less callers) and the HTTP sidecar for .NET.
+   First real Anthropic-API wiring.
+3. **burnish-11 LLM-induced subjective rules** (judged-rule upgrade), **burnish-10
+   larger lexicon baseline** (minimal). Dense embeddings for retrieval whenever.
 
 Repo hygiene: repo is **public**; profiles are gitignored user data, never
 committed. Local history was re-rooted onto the real initial commit, so
