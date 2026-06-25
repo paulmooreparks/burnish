@@ -334,9 +334,12 @@ deterministic skeleton comes first.
    attach to the profile, and flag violations the aggregate distance hides (a lone
    run-on). Wired into `score` and `style_review`. The LLM-induced *subjective*
    rules + judging payload (validated rules + evidence ask) are the upgrade.
-6. Exemplar retrieval (`retrieve/`), then the full massage loop (`enforce/`),
-   then the Stop hook (the enforcement guarantee), then the `model/` headless
-   adapter and `serve` mode.
+6. **[done, first cut]** Exemplar retrieval (`retrieve/`), deterministic: a
+   TF-IDF cosine bank over corpus chunks (`burnish retrieve`), returning
+   topically-relevant authentic-style passages as few-shot, no embedding model.
+   Dense semantic embeddings are the upgrade. Then the full massage loop
+   (`enforce/`), the Stop hook (the enforcement guarantee), and the `model/`
+   headless adapter + `serve` mode.
 
 Steps 1-2 (the deterministic walking skeleton) are already useful standalone:
 point `score` at any draft and see how far from the target voice it sits.

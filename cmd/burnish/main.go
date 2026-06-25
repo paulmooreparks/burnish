@@ -16,12 +16,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/paulmooreparks/burnish/discriminate"
 	"github.com/paulmooreparks/burnish/distill"
 	"github.com/paulmooreparks/burnish/judge"
 	"github.com/paulmooreparks/burnish/lint"
 	bpmcp "github.com/paulmooreparks/burnish/mcp"
+	"github.com/paulmooreparks/burnish/retrieve"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
 
@@ -38,6 +40,8 @@ func main() {
 		err = cmdScore(os.Args[2:])
 	case "calibrate":
 		err = cmdCalibrate(os.Args[2:])
+	case "retrieve":
+		err = cmdRetrieve(os.Args[2:])
 	case "mcp":
 		err = bpmcp.Serve(context.Background())
 	case "-h", "--help", "help":
@@ -61,10 +65,13 @@ usage:
   burnish distill   --corpus DIR --register NAME [--language en] [--id ID] [--out FILE]
   burnish score     --profile FILE [FILE]
   burnish calibrate --target DIR --decoys DIR --register NAME [--id ID] [--out FILE] [--holdout-every N]
+  burnish retrieve  --corpus DIR --query TEXT [-k N] [--min-words N]
   burnish mcp
 
   calibrate builds a profile from the target corpus and derives a discriminator
   threshold separating held-out target text from the decoy (off-style) corpus.
+  retrieve returns the corpus passages most relevant to a query, as target-style
+  few-shot exemplars.
   score reads the draft from FILE or, if omitted, from stdin.
   Add --json to score for machine-readable output.
   mcp runs the MCP server over stdio (distill, score, style_review tools).
@@ -237,6 +244,60 @@ func cmdCalibrate(args []string) error {
 		fmt.Printf("\nWARNING: %s\n", cal.Warning)
 	}
 	return nil
+}
+
+func cmdRetrieve(args []string) error {
+	fs := flag.NewFlagSet("retrieve", flag.ContinueOnError)
+	corpus := fs.String("corpus", "", "directory of target-style .md/.txt documents")
+	query := fs.String("query", "", "query text (defaults to stdin)")
+	k := fs.Int("k", 3, "number of exemplars to return")
+	minWords := fs.Int("min-words", 20, "skip corpus chunks shorter than this")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *corpus == "" {
+		return fmt.Errorf("retrieve requires --corpus")
+	}
+	q := *query
+	if q == "" {
+		b, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("read query from stdin: %w", err)
+		}
+		q = string(b)
+	}
+	if strings.TrimSpace(q) == "" {
+		return fmt.Errorf("retrieve requires a non-empty query (--query or stdin)")
+	}
+
+	docs, err := distill.ReadCorpusDir(*corpus)
+	if err != nil {
+		return err
+	}
+	rdocs := make([]retrieve.Document, len(docs))
+	for i, d := range docs {
+		rdocs[i] = retrieve.Document{Name: d.Name, Text: d.Text}
+	}
+	bank := retrieve.Build(rdocs, retrieve.Options{MinWords: *minWords})
+	results := bank.Retrieve(q, *k)
+	if len(results) == 0 {
+		fmt.Println("no relevant exemplars found.")
+		return nil
+	}
+	fmt.Printf("top %d exemplars (of %d chunks):\n", len(results), len(bank.Chunks))
+	for i, r := range results {
+		fmt.Printf("\n%d. [%.3f] %s #%d\n   %s\n", i+1, r.Score, r.Chunk.Source, r.Chunk.Index, oneLine(r.Chunk.Text, 240))
+	}
+	return nil
+}
+
+func oneLine(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n]) + "..."
+	}
+	return s
 }
 
 func printResult(p *stylespec.Profile, res lint.Result) {
