@@ -24,14 +24,19 @@ Two failure modes degrade a profile, both quietly:
 
 - **Register:** `personal-essay` — Paul's hand-written reflective/opinion essays.
 - **Language:** `en`. **Avoided:** `—`, `--` (Paul's standing preference; per-profile).
-- **Corpus:** 13 markdown essays, ~5.1K words of cleaned prose, curated (burnish-13)
-  from the `.md` files under `~/OneDrive/Documents/parkscomputing.com/wwwroot/content`.
-  The distiller ingests only `.md`/`.txt`, so that `.md` set (34 docs) was the raw
-  pool; 13 were kept, 21 dropped.
-  - **Kept:** next-train-to-bracknell, not-the-droid, vibe-coding,
+- **Corpus:** 21 essays, ~11.7K words of cleaned prose, curated from the
+  parkscomputing content tree: 13 markdown (burnish-13) + 8 HTML (burnish-16). The
+  distiller ingests only `.md`/`.txt`, so HTML essays are extracted to prose `.md`
+  by the build script.
+  - **Markdown kept (13):** next-train-to-bracknell, not-the-droid, vibe-coding,
     parks-laws-of-debugging, power-of-guitar, how-many-years-of-pizza,
     i-hate-screenshots-of-text, so-much-more-exotic, fixing-the-plumbing,
     learning-theory, on-travelling, just-spell-the-month, one-word-or-two.
+  - **HTML kept (8, Paul-confirmed):** barbecue-and-project-management,
+    becoming-a-developer-overnight-in-only-five-years, compute-magazine-archives,
+    george-orwell-and-effective-coding, personas-in-the-wild (clear essays);
+    how-i-plan-my-day, scheduling-every-minute-revisited (personal how-to);
+    master-foo-and-the-technical-recruiter (framing only, koan body cut).
   - **Dropped, contaminated/not-Paul:** my-closet-is-an-lru-cache (mostly AI,
     per Paul), accessibility-guidelines, using-ai, maize-summary, ui-engine.
   - **Dropped, off-register:** bizplan, six video scripts, agile-bridge-jd,

@@ -154,14 +154,19 @@ genuine essay vocabulary (bracknell, hotel, singapore, travel, perspective).
 
 **Extraction is now a first-class requirement (Paul, 2026-06-25):** "all of this
 extraction stuff is going to be critical to people actually using burnish ... Either
-we make it part of the tool or document the hell out of it." The HTML essays hold a
-lot of good prose too. So the next work is to build corpus ingestion (HTML extraction
-+ markdown/front-matter normalization) INTO the tool (burnish-15, broadened from a
-distill-only strip), then re-curate Paul's corpus including the HTML essays.
+we make it part of the tool or document the hell out of it." Paul's call (AskUserQuestion):
+DOCUMENT it thoroughly for now (don't build into the engine yet); the eventual built-in
+shape is a `burnish ingest` subcommand (raw files in, clean prose out, inspectable).
 
-Remaining (board): burnish-15 (first-class corpus ingestion: HTML + markdown
-normalization, built-in + documented), burnish-14 (judged rules in massage loop),
-add the HTML essays to the corpus once ingestion exists, dense embeddings (whenever).
+**burnish-16 HTML essays: DONE.** The build script now also extracts 8 Paul-confirmed
+HTML essays (5 clear reflective + 3 borderline he opted into; master-foo trimmed to its
+framing) to prose .md via html_extract. Corpus grew 13->21 docs, ~5K->~11.7K words;
+profiles/paul-essays.profile.yaml re-distilled, lexicon on-register (unix, hacker, foo,
+compute, guitar, customer, calendar, productivity).
+
+Remaining (board): burnish-15 (document corpus preparation thoroughly; now unblocked
+by burnish-16, cites the HTML-capable build script as the reference), burnish-14 (judged
+rules in massage loop), dense embeddings for retrieval (whenever).
 
 Done earlier: **burnish-10 distinctiveness baseline** rebuilt from real corpora
 (Project Gutenberg public-domain prose + a modern Wikipedia sample, ~10k-word
