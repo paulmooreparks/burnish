@@ -205,16 +205,18 @@ wrap their own LLM calls.
 - **Function-word fingerprint:** per-word frequencies of 30 high-frequency
   function words, the classic authorship-attribution signal. (Sampling-error
   corrected, so short drafts are not dominated by single-token noise.)
-- **Lexicon:** distinctive vocabulary mined against a general-English baseline
-  (preferred terms), plus the author's `--avoid` terms.
+- **Lexicon:** distinctive vocabulary mined against a ~10k-word general-English
+  frequency table (built from public-domain prose plus a modern sample; non-prose
+  tokens like markup are filtered), plus the author's `--avoid` terms.
 - **Rules:** corpus-validated structural constraints (e.g. max sentence /
   paragraph length) that catch per-instance violations the aggregate distance
   averages away.
 
 ## Known limits
 
-- The lexicon baseline is a small seed list, so some mid-frequency English words
-  read as distinctive (a larger baseline is tracked).
+- The modern (Wikipedia) portion of the distinctiveness baseline is a modest
+  sample, so some everyday-modern words can still read as mildly distinctive;
+  more modern text sharpens it further.
 - Deep authorial voice (argument structure, humor, rhythm) is asymptotic: the
   discriminator reports a distance and you drive it down, but expect a plateau.
   Frame it as "measurably close and improving," not a perfect clone.
