@@ -187,9 +187,11 @@ scrapeable, so Wikipedia is the legal modern proxy.)
 
 Repo hygiene: repo is **public**; profiles are gitignored user data, never
 committed. History was re-rooted onto the real initial commit; everything since is
-a clean fast-forward and is **pushed** to origin/main (HEAD 825f58a). The on-disk
-folder is still `bluepencil`; the GitHub repo rename to `burnish` is pending on
-Paul.
+a clean fast-forward, pushed to origin/main. The GitHub repo was **renamed
+bluepencil -> burnish** (origin now `github.com/paulmooreparks/burnish.git`). The
+on-disk folder is the last bit: rename `...\source\repos\bluepencil` ->
+`...\burnish` with the workspace closed (it can't be renamed while open). The Go
+module path was already `burnish`, so no code change is needed.
 
 ## Known limits in the current skeleton (address as they bite)
 
