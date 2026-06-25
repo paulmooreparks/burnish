@@ -112,17 +112,23 @@ catches per-instance run-ons the aggregate hides). Shared `internal/num` helper.
 -> judge(rules) -> retrieve -> massage loop (`enforce.Massage`), exposed via
 `pkg/api` and the MCP server. The revise step is the caller's LLM.
 
-Remaining (board). The whole engine + all no-API surfaces are done and PUSHED
-(distill, score, discriminate, judge, retrieve, massage loop, MCP server, Stop
-hook, pkg/api). What's left needs either the Anthropic API or is minor:
-1. **burnish-7 `model/` adapter + `serve`**: the headless inference path (Reviser
-   + judge/discriminator for agent-less callers) and the HTTP sidecar for .NET.
-   This is the FIRST real Anthropic-API wiring (key handling, model choice, cost);
-   worth confirming the approach with Paul before building.
-2. **burnish-11 LLM-induced subjective rules** (judged-rule upgrade; also needs
-   the API or an in-session agent as the inducer/judge).
-3. **burnish-10 larger lexicon baseline** (minimal, no API). Dense embeddings for
-   retrieval whenever.
+**Invariants are per-profile, NOT universal** (burnish-12, Done): burnish bakes no
+universal style rule. The built-in opinionated base is gone. Avoided terms are
+opt-in: `distill/calibrate --avoid "—,--"` (per profile) or a shared author base
+FILE via `--base`. The Stop hook enforces only what the user configures
+(`--avoid`/`--profile`/`$BURNISH_AVOID`/`$BURNISH_PROFILE`); unconfigured = nothing.
+Em-dash is otherwise just a soft feature.
+
+Remaining (board). The whole engine + all no-API surfaces are done and PUSHED. What
+is left needs the Anthropic API or is minor:
+1. **burnish-7 `model/` adapter + `serve`**: headless inference + HTTP sidecar for
+   .NET. First Anthropic-API wiring (Paul is building/testing this). CONSTRAINT
+   recorded: the serve REST API MUST be Fielding-style (HATEOAS), and code review
+   MUST enforce it (a non-hypermedia/RPC-over-HTTP design is a review failure).
+2. **burnish-11 LLM-induced subjective rules** (judged-rule upgrade; needs the API
+   or an in-session agent).
+3. **burnish-10 larger lexicon baseline** (minimal, no API; PAUSED mid-start to do
+   burnish-12). Dense embeddings for retrieval whenever.
 
 Repo hygiene: repo is **public**; profiles are gitignored user data, never
 committed. Local history was re-rooted onto the real initial commit, so
