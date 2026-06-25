@@ -205,9 +205,10 @@ wrap their own LLM calls.
 - **Function-word fingerprint:** per-word frequencies of 30 high-frequency
   function words, the classic authorship-attribution signal. (Sampling-error
   corrected, so short drafts are not dominated by single-token noise.)
-- **Lexicon:** distinctive vocabulary mined against a ~10k-word general-English
-  frequency table (built from public-domain prose plus a modern sample; non-prose
-  tokens like markup are filtered), plus the author's `--avoid` terms.
+- **Lexicon:** distinctive vocabulary mined against a 20k-word general-English
+  frequency table (built from ~7.3M words of public-domain prose plus a modern
+  sample; non-prose tokens like markup are filtered), plus the author's `--avoid`
+  terms. Reproducible via `scripts/fetch-baseline-corpus.sh`.
 - **Rules:** corpus-validated structural constraints (e.g. max sentence /
   paragraph length) that catch per-instance violations the aggregate distance
   averages away.

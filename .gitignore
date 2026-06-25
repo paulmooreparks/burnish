@@ -36,3 +36,6 @@ go.work.sum
 
 # Style profiles are user data (stylometric fingerprints); keep them local
 *.profile.yaml
+
+# Fetched baseline source corpus (derived counts are committed; raw text is not)
+/.baseline-corpus/
