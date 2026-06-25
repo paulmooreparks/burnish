@@ -149,19 +149,18 @@ Nothing is pushed yet.
   at corpus-doc length, so only the *extra* shortfall is added in quadrature. At
   document scale unchanged (threshold stays valid); short drafts no longer let a
   single token read as a 20-stddev outlier.
-- **Lexicon baseline is a small seed list** (~190 words, Zipf-modeled). Mid-
-  frequency English words absent from it can score as distinctive. minDocs/
-  minCount floors + the 3-char filter blunt it; a larger embedded baseline is
-  the real fix (tracked).
-- **Avoided-lexicon is hand-seeded** (em-dash + "--" only). Real avoided-term
-  mining needs the LLM-voice decoy corpus, which lands with `discriminate/`.
-- **base/inherit is faked.** The em-dash invariant is baked inline in distill
-  rather than living in a shared base profile. Implement real inheritance when
-  `stylespec/` gains a merge step (parked open question).
+- ~~Lexicon baseline small seed list~~ **[fixed, burnish-10]** now a ~10k-word
+  real-frequency table from Gutenberg + a modern Wikipedia sample. Remaining: the
+  modern (Wikipedia) portion is modest; more modern text would sharpen it.
+- ~~Avoided-lexicon hand-seeded~~ **[fixed, burnish-12]** avoided terms are
+  per-profile and opt-in (`--avoid`); no universal default.
+- ~~base/inherit is faked~~ **[fixed, burnish-9/12]** real `stylespec.Merge`/
+  `Resolve` (load-time, author-provided base file); no built-in opinionated base.
 
 ## Open questions parked for later
 
-- Embedding model + vector store for the exemplar bank (`retrieve/`).
+- Dense embedding model + vector store for the exemplar bank (`retrieve/`): the
+  upgrade over the shipped TF-IDF first cut (burnish-4).
 - Threshold-tuning UX: how Paul inspects and adjusts feature weights and the
   discriminator threshold.
 
