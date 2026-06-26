@@ -65,6 +65,21 @@ func TestListTools(t *testing.T) {
 	}
 }
 
+func TestServerShipsUseProtocol(t *testing.T) {
+	cs := connect(t)
+	got := cs.InitializeResult().Instructions
+	if got == "" {
+		t.Fatal("server shipped no instructions; agents have no source for the use protocol")
+	}
+	// The protocol must carry the loop, the fresh-context discipline, and the
+	// one-register-per-profile rule, the three things a tool description cannot.
+	for _, want := range []string{"style_review", "FRESH", "register"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("instructions missing %q:\n%s", want, got)
+		}
+	}
+}
+
 func TestDistillScoreReviewRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	corpus := filepath.Join(dir, "corpus")
@@ -108,7 +123,7 @@ func TestDistillScoreReviewRoundTrip(t *testing.T) {
 		t.Errorf("expected a hard violation (em-dash) in score output: %s", stext)
 	}
 
-	// style_review should surface the lexicon and the deferred-judgement marker.
+	// style_review should surface the lexicon and the fresh-context instruction.
 	rres, rtext := callText(t, cs, "style_review", map[string]any{
 		"profile_path": profile,
 		"text":         "This is a draft to review.",

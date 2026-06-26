@@ -16,6 +16,43 @@ import (
 // version is reported to clients in the server implementation info.
 const version = "0.1.0"
 
+// instructions is the server-level protocol sent to clients in the initialize
+// result. A connected agent sees this as its source of truth for HOW to use
+// burnish, the per-tool descriptions only describe each tool in isolation and
+// cannot carry the loop, the profile choice, or the fresh-context discipline.
+const instructions = `burnish enforces a target writing style on LLM output. A generating model only
+biases toward a style and forgets it as context grows; burnish moves enforcement
+OUT of the generator into deterministic checks plus an isolated judge, so style
+is measured, not merely hoped for.
+
+Use it as a loop around your own drafting:
+ 1. Draft normally.
+ 2. Before you return prose to the user, call style_review with the draft and the
+    profile_path for the target register. It returns a deterministic gap report
+    (off-target features, avoided terms present, rule violations), the distance-to-
+    style number and an on-target/off-target verdict when the profile is calibrated,
+    the preferred/avoided lexicon, the rules, and, when the profile has subjective
+    judged rules, a judging_prompt.
+ 3. Revise to close the gaps: bring off-target features into range, drop avoided
+    terms, favor the preferred lexicon, fix the quoted rule violations.
+ 4. Re-run style_review. Stop when the verdict is on-target with zero hard
+    violations, or after 3 rounds, whichever comes first. Returns diminish past 3 rounds.
+
+Judge in a FRESH, ISOLATED context. The subjective judged rules (judging_prompt)
+and any holistic "does this read like the corpus" call must be made by a separate
+subagent or invocation, never the context that wrote the draft, which cannot grade
+its own work. The deterministic results (distance, rule_violations, discriminator
+verdict) need no model and are trustworthy as returned.
+
+Profiles: each profile_path is a distilled style for ONE register. Never mix
+registers, a single global profile averages distinct voices to mush. If you do not
+know which profile to pass, ask the user or list the profiles directory; do not
+guess.
+
+Tool map: score is the cheap deterministic-only check; style_review is the full
+revision payload you loop on; distill builds a profile from a single-register
+corpus.`
+
 // Serve runs the burnish MCP server on the stdio transport until the client
 // disconnects or ctx is cancelled.
 func Serve(ctx context.Context) error {
@@ -25,7 +62,8 @@ func Serve(ctx context.Context) error {
 // NewServer builds the MCP server with the distill, score, and style_review
 // tools registered.
 func NewServer() *sdk.Server {
-	s := sdk.NewServer(&sdk.Implementation{Name: "burnish", Version: version}, nil)
+	s := sdk.NewServer(&sdk.Implementation{Name: "burnish", Version: version},
+		&sdk.ServerOptions{Instructions: instructions})
 
 	sdk.AddTool(s, &sdk.Tool{
 		Name: "distill",
@@ -42,10 +80,12 @@ func NewServer() *sdk.Server {
 
 	sdk.AddTool(s, &sdk.Tool{
 		Name: "style_review",
-		Description: "Review a draft against a profile and return a revision payload: the deterministic " +
-			"gap report plus the profile's preferred/avoided lexicon and rules. The judgement (rule judge " +
-			"and calibrated discriminator) is not yet built; you, the calling agent, render it. Judge in a " +
-			"FRESH, ISOLATED context, not the one that wrote the draft, to avoid grading your own work.",
+		Description: "Review a draft against a profile and return the full revision payload: the deterministic " +
+			"gap report (off-target features, avoided terms, deterministic rule violations), the distance-to-style " +
+			"number and calibrated on-target/off-target verdict when the profile is calibrated, the preferred/avoided " +
+			"lexicon, the rules, and a judging_prompt for the profile's subjective judged rules. The deterministic " +
+			"checks and the discriminator verdict are computed here; you, the calling agent, render the subjective " +
+			"judged-rule verdict, in a FRESH, ISOLATED context, never the one that wrote the draft.",
 	}, handleStyleReview)
 
 	return s
@@ -267,7 +307,8 @@ func reviewSummary(p *stylespec.Profile, res lint.Result) string {
 	if len(p.Lexicon.Preferred) > 0 {
 		s += "\npreferred lexicon: " + strings.Join(p.Lexicon.Preferred, ", ")
 	}
-	s += "\njudgement: render it yourself in a fresh, isolated context (judge/discriminator not yet built)."
+	s += "\njudgement: deterministic checks and the discriminator verdict are above; render the subjective" +
+		" judged-rule verdict yourself in a fresh, isolated context."
 	return s
 }
 
