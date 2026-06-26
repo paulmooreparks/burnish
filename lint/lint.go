@@ -83,8 +83,17 @@ func Check(draft string, p *stylespec.Profile) (Result, error) {
 		if !ok {
 			continue
 		}
+		scale := scaleFor(f, nWords, corpusDocWords)
+		if scale < epsilon {
+			// No measurable spread: a non-rate feature that was constant across the
+			// corpus (per-1k rates are floored above epsilon by scaleFor). With no
+			// scale we cannot say how surprising a draft value is, so the feature is
+			// not enforceable, skip it entirely rather than fabricate a near-infinite
+			// outlier that would dominate the distance (burnish-24).
+			continue
+		}
 		weightTotal += f.Weight
-		dev := deviation(v, f.Target, scaleFor(f, nWords, corpusDocWords))
+		dev := deviation(v, f.Target, scale)
 		if dev <= 0 {
 			continue
 		}

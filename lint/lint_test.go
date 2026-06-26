@@ -70,6 +70,39 @@ func TestZeroRateFeatureIsSoftAndBounded(t *testing.T) {
 	}
 }
 
+// TestZeroVarianceNonRateFeatureSkipped is the burnish-24 regression: a non-rate
+// feature constant across the corpus (std=0) has no measurable scale, so it must
+// be skipped, not fabricate a near-infinite deviation that dominates the distance.
+func TestZeroVarianceNonRateFeatureSkipped(t *testing.T) {
+	p := &stylespec.Profile{
+		Language: "en",
+		Corpus:   stylespec.CorpusStats{Documents: 12, Words: 12000},
+		Features: []stylespec.Feature{
+			// Non-rate (not a per-1k rate, not a function-word feature), zero variance.
+			{ID: "sentence_len_mean", Mean: 8, Stddev: 0, Weight: 1,
+				Target: stylespec.Target{Min: stylespec.Ptr(8.0), Max: stylespec.Ptr(8.0)}},
+		},
+	}
+	// A draft whose mean sentence length is clearly not 8.
+	draft := "This is a deliberately long single sentence that runs well past eight words to force a large raw gap."
+	res, err := Check(draft, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.HardViolations != 0 {
+		t.Errorf("zero-variance non-rate feature must not hard-fail, got %d", res.HardViolations)
+	}
+	for _, fv := range res.Features {
+		if fv.ID == "sentence_len_mean" {
+			t.Errorf("zero-variance non-rate feature should be skipped, got deviation %.1f", fv.Deviation)
+		}
+	}
+	// With the only feature skipped, the draft is not spuriously far from style.
+	if res.Distance != 0 {
+		t.Errorf("distance should be 0 when the only feature is unenforceable, got %.3f", res.Distance)
+	}
+}
+
 func TestCheckShortDraftDampensSingleToken(t *testing.T) {
 	// A profile where "fw.an" is rare (mean 4) with modest spread; a long corpus.
 	p := &stylespec.Profile{
