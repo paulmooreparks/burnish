@@ -28,7 +28,9 @@ is measured, not merely hoped for.
 Use it as a loop around your own drafting:
  1. Draft normally.
  2. Before you return prose to the user, call style_review with the draft and the
-    profile_path for the target register. It returns a deterministic gap report
+    target register's profile (pass profile= with an id or register name; call
+    list_profiles first if you do not know it, or pass an explicit profile_path).
+    It returns a deterministic gap report
     (off-target features, avoided terms present, rule violations), the distance-to-
     style number and an on-target/off-target verdict when the profile is calibrated,
     the preferred/avoided lexicon, the rules, and, when the profile has subjective
@@ -44,51 +46,115 @@ subagent or invocation, never the context that wrote the draft, which cannot gra
 its own work. The deterministic results (distance, rule_violations, discriminator
 verdict) need no model and are trustworthy as returned.
 
-Profiles: each profile_path is a distilled style for ONE register. Never mix
-registers, a single global profile averages distinct voices to mush. If you do not
-know which profile to pass, ask the user or list the profiles directory; do not
-guess.
+Profiles: each profile is a distilled style for ONE register. Never mix registers,
+a single global profile averages distinct voices to mush. If you do not know which
+profile to pass, call list_profiles and choose by register; do not guess.
 
-Tool map: score is the cheap deterministic-only check; style_review is the full
-revision payload you loop on; distill builds a profile from a single-register
-corpus.`
+Tool map: list_profiles enumerates the available profiles; score is the cheap
+deterministic-only check; style_review is the full revision payload you loop on;
+distill builds a profile from a single-register corpus.`
 
-// Serve runs the burnish MCP server on the stdio transport until the client
-// disconnects or ctx is cancelled.
-func Serve(ctx context.Context) error {
-	return NewServer().Run(ctx, &sdk.StdioTransport{})
+// server holds the per-instance configuration shared by the tool handlers. The
+// profiles directory is what lets a caller name a register instead of passing a
+// filesystem path: list_profiles enumerates it, and score/style_review resolve
+// a profile name against it.
+type server struct {
+	profilesDir string
 }
 
-// NewServer builds the MCP server with the distill, score, and style_review
-// tools registered.
-func NewServer() *sdk.Server {
+// Serve runs the burnish MCP server on the stdio transport until the client
+// disconnects or ctx is cancelled. profilesDir is the directory whose
+// *.profile.yaml files are discoverable by name; pass "" to disable name
+// resolution (callers must then give an explicit profile_path).
+func Serve(ctx context.Context, profilesDir string) error {
+	return NewServer(profilesDir).Run(ctx, &sdk.StdioTransport{})
+}
+
+// NewServer builds the MCP server with the list_profiles, distill, score, and
+// style_review tools registered. profilesDir backs profile-by-name resolution;
+// "" leaves only the explicit profile_path path working.
+func NewServer(profilesDir string) *sdk.Server {
+	srv := &server{profilesDir: profilesDir}
 	s := sdk.NewServer(&sdk.Implementation{Name: "burnish", Version: version},
 		&sdk.ServerOptions{Instructions: instructions})
+
+	sdk.AddTool(s, &sdk.Tool{
+		Name: "list_profiles",
+		Description: "List the distilled style profiles available to this server, each with its id, " +
+			"register, language, whether it is calibrated, and its path. Call this first to learn which " +
+			"profile to pass to score/style_review; you can then refer to one by id or register name, not " +
+			"by filesystem path.",
+	}, srv.handleListProfiles)
 
 	sdk.AddTool(s, &sdk.Tool{
 		Name: "distill",
 		Description: "Distill a single-register corpus (a directory of .md/.txt files) into a " +
 			"style profile written to disk. Feed one genre at a time; mixing registers averages to mush.",
-	}, handleDistill)
+	}, srv.handleDistill)
 
 	sdk.AddTool(s, &sdk.Tool{
 		Name: "score",
-		Description: "Score a draft against a distilled profile. Returns a distance-to-style number " +
-			"(weighted stddev deviation; 0 = within all target ranges), the off-target features, and " +
-			"any hard violations (e.g. em-dashes). Deterministic, no model.",
-	}, handleScore)
+		Description: "Score a draft against a distilled profile. Identify the profile by `profile` (an id " +
+			"or register name resolved against the server's profiles directory; call list_profiles) or by an " +
+			"explicit `profile_path`. Returns a distance-to-style number (weighted stddev deviation; 0 = within " +
+			"all target ranges), the off-target features, and any hard violations (e.g. em-dashes). Deterministic, no model.",
+	}, srv.handleScore)
 
 	sdk.AddTool(s, &sdk.Tool{
 		Name: "style_review",
 		Description: "Review a draft against a profile and return the full revision payload: the deterministic " +
 			"gap report (off-target features, avoided terms, deterministic rule violations), the distance-to-style " +
 			"number and calibrated on-target/off-target verdict when the profile is calibrated, the preferred/avoided " +
-			"lexicon, the rules, and a judging_prompt for the profile's subjective judged rules. The deterministic " +
+			"lexicon, the rules, and a judging_prompt for the profile's subjective judged rules. Identify the profile " +
+			"by `profile` (id or register name; call list_profiles) or by an explicit `profile_path`. The deterministic " +
 			"checks and the discriminator verdict are computed here; you, the calling agent, render the subjective " +
 			"judged-rule verdict, in a FRESH, ISOLATED context, never the one that wrote the draft.",
-	}, handleStyleReview)
+	}, srv.handleStyleReview)
 
 	return s
+}
+
+// --- list_profiles -------------------------------------------------------
+
+type listProfilesResult struct {
+	ProfilesDir string                  `json:"profiles_dir"`
+	Profiles    []stylespec.ProfileInfo `json:"profiles"`
+	Note        string                  `json:"note,omitempty"`
+}
+
+func (s *server) handleListProfiles(ctx context.Context, _ *sdk.CallToolRequest, _ struct{}) (*sdk.CallToolResult, listProfilesResult, error) {
+	if s.profilesDir == "" {
+		res := listProfilesResult{Note: "no profiles directory configured; pass an explicit profile_path, or start the server with --profiles / $BURNISH_PROFILE_DIR"}
+		return textResult(res.Note, res)
+	}
+	infos, err := stylespec.ListProfiles(s.profilesDir)
+	if err != nil {
+		return errResult[listProfilesResult](fmt.Sprintf("list profiles in %s: %v", s.profilesDir, err))
+	}
+	res := listProfilesResult{ProfilesDir: s.profilesDir, Profiles: infos}
+	if len(infos) == 0 {
+		res.Note = "no *.profile.yaml files found in " + s.profilesDir
+	}
+	return textResult(listProfilesSummary(res), res)
+}
+
+func listProfilesSummary(res listProfilesResult) string {
+	if len(res.Profiles) == 0 {
+		if res.Note != "" {
+			return res.Note
+		}
+		return "no profiles available"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d profile(s) in %s:\n", len(res.Profiles), res.ProfilesDir)
+	for _, p := range res.Profiles {
+		cal := "uncalibrated"
+		if p.Calibrated {
+			cal = "calibrated"
+		}
+		fmt.Fprintf(&b, "  %-20s register=%s language=%s [%s]\n", p.ID, p.Register, p.Language, cal)
+	}
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // --- distill -------------------------------------------------------------
@@ -110,7 +176,7 @@ type distillResult struct {
 	Note         string `json:"note,omitempty"`
 }
 
-func handleDistill(ctx context.Context, _ *sdk.CallToolRequest, a distillArgs) (*sdk.CallToolResult, distillResult, error) {
+func (s *server) handleDistill(ctx context.Context, _ *sdk.CallToolRequest, a distillArgs) (*sdk.CallToolResult, distillResult, error) {
 	if a.CorpusDir == "" || a.Register == "" {
 		return errResult[distillResult]("distill requires corpus_dir and register")
 	}
@@ -160,7 +226,8 @@ func handleDistill(ctx context.Context, _ *sdk.CallToolRequest, a distillArgs) (
 // --- score ---------------------------------------------------------------
 
 type scoreArgs struct {
-	ProfilePath string `json:"profile_path" jsonschema:"path to a distilled profile YAML"`
+	Profile     string `json:"profile,omitempty" jsonschema:"profile id or register name, resolved against the server's profiles directory (see list_profiles)"`
+	ProfilePath string `json:"profile_path,omitempty" jsonschema:"explicit path to a distilled profile YAML; an alternative to profile"`
 	Text        string `json:"text" jsonschema:"the draft text to score"`
 }
 
@@ -169,8 +236,8 @@ type scoreResult struct {
 	RuleViolations []judge.RuleViolation `json:"rule_violations,omitempty"`
 }
 
-func handleScore(ctx context.Context, _ *sdk.CallToolRequest, a scoreArgs) (*sdk.CallToolResult, scoreResult, error) {
-	prof, res, err := loadAndCheck(a.ProfilePath, a.Text)
+func (s *server) handleScore(ctx context.Context, _ *sdk.CallToolRequest, a scoreArgs) (*sdk.CallToolResult, scoreResult, error) {
+	prof, res, err := s.loadAndCheck(a.Profile, a.ProfilePath, a.Text)
 	if err != nil {
 		return errResult[scoreResult](err.Error())
 	}
@@ -181,7 +248,8 @@ func handleScore(ctx context.Context, _ *sdk.CallToolRequest, a scoreArgs) (*sdk
 // --- style_review --------------------------------------------------------
 
 type reviewArgs struct {
-	ProfilePath string `json:"profile_path" jsonschema:"path to a distilled profile YAML"`
+	Profile     string `json:"profile,omitempty" jsonschema:"profile id or register name, resolved against the server's profiles directory (see list_profiles)"`
+	ProfilePath string `json:"profile_path,omitempty" jsonschema:"explicit path to a distilled profile YAML; an alternative to profile"`
 	Text        string `json:"text" jsonschema:"the draft text to review"`
 }
 
@@ -201,8 +269,8 @@ type reviewResult struct {
 	Guidance         string                  `json:"guidance"`
 }
 
-func handleStyleReview(ctx context.Context, _ *sdk.CallToolRequest, a reviewArgs) (*sdk.CallToolResult, reviewResult, error) {
-	prof, res, err := loadAndCheck(a.ProfilePath, a.Text)
+func (s *server) handleStyleReview(ctx context.Context, _ *sdk.CallToolRequest, a reviewArgs) (*sdk.CallToolResult, reviewResult, error) {
+	prof, res, err := s.loadAndCheck(a.Profile, a.ProfilePath, a.Text)
 	if err != nil {
 		return errResult[reviewResult](err.Error())
 	}
@@ -255,11 +323,18 @@ func ruleSummary(rv []judge.RuleViolation) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func loadAndCheck(profilePath, text string) (*stylespec.Profile, lint.Result, error) {
-	if profilePath == "" {
-		return nil, lint.Result{}, fmt.Errorf("profile_path is required")
+// loadAndCheck resolves the profile (by name against the server's profiles
+// directory, or by explicit path) and lints text against it. profilePath wins
+// when both are given.
+func (s *server) loadAndCheck(profile, profilePath, text string) (*stylespec.Profile, lint.Result, error) {
+	ref := profilePath
+	if ref == "" {
+		ref = profile
 	}
-	prof, err := stylespec.Load(profilePath)
+	if ref == "" {
+		return nil, lint.Result{}, fmt.Errorf("a profile is required: pass `profile` (an id or register name; see list_profiles) or `profile_path`")
+	}
+	prof, err := stylespec.ResolveProfile(s.profilesDir, ref)
 	if err != nil {
 		return nil, lint.Result{}, err
 	}

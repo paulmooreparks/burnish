@@ -10,14 +10,21 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// connect wires a client to an in-process burnish server and returns the
-// client session.
+// connect wires a client to an in-process burnish server (with no profiles
+// directory) and returns the client session.
 func connect(t *testing.T) *sdk.ClientSession {
+	t.Helper()
+	return connectDir(t, "")
+}
+
+// connectDir is connect with a configured profiles directory, for the
+// name-resolution and list_profiles tests.
+func connectDir(t *testing.T, profilesDir string) *sdk.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	clientT, serverT := sdk.NewInMemoryTransports()
 
-	srv := NewServer()
+	srv := NewServer(profilesDir)
 	ss, err := srv.Connect(ctx, serverT, nil)
 	if err != nil {
 		t.Fatalf("server connect: %v", err)
@@ -58,10 +65,99 @@ func TestListTools(t *testing.T) {
 	for _, tool := range res.Tools {
 		got[tool.Name] = true
 	}
-	for _, want := range []string{"distill", "score", "style_review"} {
+	for _, want := range []string{"list_profiles", "distill", "score", "style_review"} {
 		if !got[want] {
 			t.Errorf("missing tool %q (have %v)", want, got)
 		}
+	}
+}
+
+// TestProfileByName exercises the registry path: list_profiles enumerates a
+// configured directory, and score/style_review resolve a profile by register
+// name rather than a filesystem path.
+func TestProfileByName(t *testing.T) {
+	dir := t.TempDir()
+	corpus := filepath.Join(dir, "corpus")
+	if err := os.MkdirAll(corpus, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(corpus, "a.md"), "The engine measures style. It does not guess. "+
+		"A profile records the language it was built for. Distance is a number, not a vibe.")
+	write(t, filepath.Join(corpus, "b.md"), "Build the engine once. Expose it through a hook, a library, and a sidecar. "+
+		"Deterministic checks run first and free. The judge sees only what is left.")
+
+	// A profiles dir whose file the agent should NOT need to know about.
+	profilesDir := filepath.Join(dir, "profiles")
+	if err := os.MkdirAll(profilesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// distill writes the profile into profilesDir under the stem convention.
+	cs := connectDir(t, profilesDir)
+	dres, dtext := callText(t, cs, "distill", map[string]any{
+		"corpus_dir": corpus,
+		"register":   "house",
+		"id":         "house",
+		"out":        filepath.Join(profilesDir, "house.profile.yaml"),
+	})
+	if dres.IsError {
+		t.Fatalf("distill errored: %s", dtext)
+	}
+
+	// list_profiles should surface the profile by id/register, no path needed.
+	lres, ltext := callText(t, cs, "list_profiles", map[string]any{})
+	if lres.IsError {
+		t.Fatalf("list_profiles errored: %s", ltext)
+	}
+	if !strings.Contains(ltext, "house") {
+		t.Errorf("list_profiles should name the 'house' profile: %s", ltext)
+	}
+
+	// score by register NAME, not by path.
+	sres, stext := callText(t, cs, "score", map[string]any{
+		"profile": "house",
+		"text":    "This is a short draft to score by name.",
+	})
+	if sres.IsError {
+		t.Fatalf("score by name errored: %s", stext)
+	}
+	if !strings.Contains(stext, "register house") {
+		t.Errorf("score should resolve the named profile: %s", stext)
+	}
+
+	// style_review by name should also work and instruct fresh-context judging.
+	rres, rtext := callText(t, cs, "style_review", map[string]any{
+		"profile": "house",
+		"text":    "Another draft to review by name.",
+	})
+	if rres.IsError {
+		t.Fatalf("style_review by name errored: %s", rtext)
+	}
+	if !strings.Contains(strings.ToLower(rtext), "fresh") {
+		t.Errorf("style_review should instruct fresh-context judgement: %s", rtext)
+	}
+
+	// An unknown name is a clear error, not a silent miss.
+	ures, utext := callText(t, cs, "score", map[string]any{
+		"profile": "nonesuch",
+		"text":    "x",
+	})
+	if !ures.IsError {
+		t.Fatalf("expected error for unknown profile name, got: %s", utext)
+	}
+
+	// When both are given, profile_path wins: a real path with a bogus name must
+	// score against the path, not error on the name.
+	bres, btext := callText(t, cs, "score", map[string]any{
+		"profile":      "nonesuch",
+		"profile_path": filepath.Join(profilesDir, "house.profile.yaml"),
+		"text":         "draft scored via the explicit path.",
+	})
+	if bres.IsError {
+		t.Fatalf("profile_path should win over profile: %s", btext)
+	}
+	if !strings.Contains(btext, "register house") {
+		t.Errorf("expected the path-resolved profile: %s", btext)
 	}
 }
 

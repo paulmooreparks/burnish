@@ -3,7 +3,7 @@
 //	distill    build a style profile from a single-register corpus
 //	score      measure a draft's distance from a profile's target style
 //	calibrate  derive a discriminator threshold from target vs decoy corpora
-//	mcp        run the MCP server (stdio) exposing distill/score/style_review
+//	mcp        run the MCP server (stdio) exposing list_profiles/distill/score/style_review
 //	serve      run the headless HTTP REST API (Fielding-style) for .NET/CI callers
 //
 // See DESIGN.md.
@@ -47,7 +47,7 @@ func main() {
 	case "hook":
 		err = cmdHook(os.Args[2:])
 	case "mcp":
-		err = bpmcp.Serve(context.Background())
+		err = cmdMCP(os.Args[2:])
 	case "serve":
 		err = cmdServe(os.Args[2:])
 	case "-h", "--help", "help":
@@ -73,7 +73,7 @@ usage:
   burnish calibrate --target DIR --decoys DIR --register NAME [--id ID] [--out FILE] [--holdout-every N] [--avoid "—,--"] [--base FILE]
   burnish retrieve  --corpus DIR --query TEXT [-k N] [--min-words N]
   burnish hook      [--avoid "—,--"] [--profile FILE]
-  burnish mcp
+  burnish mcp       [--profiles DIR]
   burnish serve     --profiles DIR [--addr :8080] [--model NAME]
 
   --avoid lists terms this author avoids (hard violations); burnish imposes no
@@ -88,13 +88,25 @@ usage:
   $BURNISH_AVOID / $BURNISH_PROFILE). With nothing configured it enforces nothing.
   score reads the draft from FILE or, if omitted, from stdin.
   Add --json to score for machine-readable output.
-  mcp runs the MCP server over stdio (distill, score, style_review tools).
+  mcp runs the MCP server over stdio (list_profiles, distill, score, style_review
+  tools). --profiles (or $BURNISH_PROFILE_DIR) makes profiles discoverable by id or
+  register name; without it, tools need an explicit profile_path.
   serve runs the headless HTTP REST API (Fielding-style/HATEOAS) over the engine
   for agent-less callers (.NET sidecar, CI). It loads every *.profile.yaml under
   --profiles. If ANTHROPIC_API_KEY is set it also offers the massage action via the
   built-in model adapter (--model, default `+model.DefaultModel+`); without a key
   the massage action is simply absent from the API.
 `)
+}
+
+func cmdMCP(args []string) error {
+	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
+	profilesDir := fs.String("profiles", os.Getenv("BURNISH_PROFILE_DIR"),
+		"directory of *.profile.yaml files discoverable by name (list_profiles, profile=)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return bpmcp.Serve(context.Background(), *profilesDir)
 }
 
 func cmdServe(args []string) error {
@@ -433,4 +445,3 @@ func rangeStr(min, max *float64) string {
 	}
 	return "[" + lo + ", " + hi + "]"
 }
-

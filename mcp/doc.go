@@ -1,10 +1,14 @@
 // Package mcp is the primary agentic surface: an MCP server over the burnish
 // engine. Tools:
 //
+//	list_profiles  enumerate the profiles discoverable by id / register name
 //	distill        corpus -> style profile
 //	score          draft + profile -> deterministic distance + violations
 //	style_review   draft + profile -> gap report + lexicon + corpus-validated
 //	               rules + discriminator verdict + judged-rule prompt
+//
+// score and style_review take the profile by id / register name (resolved against
+// the server's --profiles directory) or by an explicit profile_path.
 //
 // The server-level instructions (sent in the initialize result) carry the use
 // protocol: the draft -> review -> revise loop, its bound, which profile to pass,
