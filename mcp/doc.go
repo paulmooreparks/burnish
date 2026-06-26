@@ -3,6 +3,8 @@
 //
 //	list_profiles  enumerate the profiles discoverable by id / register name
 //	distill        corpus -> style profile
+//	calibrate      target + decoy corpora -> profile + discriminator threshold
+//	retrieve       corpus + query -> target-style exemplar passages
 //	score          draft + profile -> deterministic distance + violations
 //	style_review   draft + profile -> gap report + lexicon + corpus-validated
 //	               rules + discriminator verdict + judged-rule prompt

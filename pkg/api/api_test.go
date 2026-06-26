@@ -71,6 +71,65 @@ func TestDistillRequiresRegister(t *testing.T) {
 	}
 }
 
+// TestCalibrateFinishesProfile checks that calibrate produces a profile with a
+// discriminator (the calibrated threshold) AND the same mined rule layer distill
+// produces, so a calibrated profile is never weaker than a distilled one.
+func TestCalibrateFinishesProfile(t *testing.T) {
+	target := corpusDocs(t)
+	// Decoys: longer, rambling sentences, the off-style negative class.
+	dir := t.TempDir()
+	decoyBody := "This particular sentence wanders on at considerable length, accumulating clause upon clause, never quite arriving at its point, which is precisely the off-style trait the discriminator should learn to separate from the terse target voice."
+	for _, n := range []string{"x.md", "y.md", "z.md", "w.md"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte(decoyBody), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	decoys, err := distill.ReadCorpusDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := Calibrate(target, decoys, CalibrateOptions{Register: "r", HoldoutEvery: 2})
+	if err != nil {
+		t.Fatalf("Calibrate: %v", err)
+	}
+	if outcome.Profile.Discriminator == nil {
+		t.Error("calibrated profile has no discriminator")
+	}
+	if outcome.DeterministicRules == 0 || len(outcome.Profile.Rules) == 0 {
+		t.Error("calibrated profile skipped the rule layer (parity with distill broken)")
+	}
+	if outcome.Calibration == nil {
+		t.Fatal("no calibration metrics returned")
+	}
+}
+
+func TestCalibrateRequiresRegister(t *testing.T) {
+	docs := corpusDocs(t)
+	if _, err := Calibrate(docs, docs, CalibrateOptions{}); err == nil {
+		t.Error("Calibrate with no register should error")
+	}
+}
+
+// TestRetrieve checks the exemplar path: a query returns ranked passages, and an
+// empty query is a clear error.
+func TestRetrieve(t *testing.T) {
+	docs := corpusDocs(t)
+	results, err := Retrieve(docs, "the dog ran home", RetrieveOptions{K: 2, MinWords: 1})
+	if err != nil {
+		t.Fatalf("Retrieve: %v", err)
+	}
+	if len(results) == 0 {
+		t.Error("expected at least one exemplar")
+	}
+	if len(results) > 2 {
+		t.Errorf("K=2 should cap results, got %d", len(results))
+	}
+	if _, err := Retrieve(docs, "   ", RetrieveOptions{}); err == nil {
+		t.Error("empty query should error")
+	}
+}
+
 // TestDistillMergesJudgedRules covers the most subtle path: judged rules from a
 // rules-file are merged AFTER base resolution and deduped by id against the
 // mined rules. A judged rule with a fresh id is added; one whose id collides

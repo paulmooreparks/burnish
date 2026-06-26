@@ -3,7 +3,7 @@
 //	distill    build a style profile from a single-register corpus
 //	score      measure a draft's distance from a profile's target style
 //	calibrate  derive a discriminator threshold from target vs decoy corpora
-//	mcp        run the MCP server (stdio) exposing list_profiles/distill/score/style_review
+//	mcp        run the MCP server (stdio) exposing list_profiles/distill/calibrate/retrieve/score/style_review
 //	serve      run the headless HTTP REST API (Fielding-style) for .NET/CI callers
 //
 // See DESIGN.md.
@@ -18,14 +18,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/paulmooreparks/burnish/discriminate"
 	"github.com/paulmooreparks/burnish/distill"
 	"github.com/paulmooreparks/burnish/judge"
 	"github.com/paulmooreparks/burnish/lint"
 	bpmcp "github.com/paulmooreparks/burnish/mcp"
 	"github.com/paulmooreparks/burnish/model"
 	"github.com/paulmooreparks/burnish/pkg/api"
-	"github.com/paulmooreparks/burnish/retrieve"
 	"github.com/paulmooreparks/burnish/serve"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
@@ -89,9 +87,9 @@ usage:
   $BURNISH_AVOID / $BURNISH_PROFILE). With nothing configured it enforces nothing.
   score reads the draft from FILE or, if omitted, from stdin.
   Add --json to score for machine-readable output.
-  mcp runs the MCP server over stdio (list_profiles, distill, score, style_review
-  tools). --profiles (or $BURNISH_PROFILE_DIR) makes profiles discoverable by id or
-  register name; without it, tools need an explicit profile_path.
+  mcp runs the MCP server over stdio (list_profiles, distill, calibrate, retrieve,
+  score, style_review tools). --profiles (or $BURNISH_PROFILE_DIR) makes profiles
+  discoverable by id or register name; without it, tools need an explicit profile_path.
   serve runs the headless HTTP REST API (Fielding-style/HATEOAS) over the engine
   for agent-less callers (.NET sidecar, CI). It loads every *.profile.yaml under
   --profiles. If ANTHROPIC_API_KEY is set it also offers the massage action via the
@@ -293,19 +291,20 @@ func cmdCalibrate(args []string) error {
 		return fmt.Errorf("need .md/.txt docs in both --target (%d) and --decoys (%d)", len(targetDocs), len(decoyDocs))
 	}
 
-	opts := discriminate.DefaultOptions()
-	opts.HoldoutEvery = *holdout
-	opts.Distill.Avoid = splitCSV(*avoid)
-	prof, cal, err := discriminate.Calibrate(idV, *register, *language, targetDocs, decoyDocs, opts)
+	// Shared path with the MCP calibrate tool, so they cannot drift.
+	outcome, err := api.Calibrate(targetDocs, decoyDocs, api.CalibrateOptions{
+		ID:           idV,
+		Register:     *register,
+		Language:     *language,
+		Avoid:        splitCSV(*avoid),
+		BasePath:     *base,
+		HoldoutEvery: *holdout,
+	})
 	if err != nil {
 		return err
 	}
-	prof.Rules = judge.Mine(targetDocs, judge.DefaultMinSupport)
-	prof.Inherits = *base
-	if prof, err = stylespec.Resolve(prof, ""); err != nil {
-		return err
-	}
-	if err := prof.Save(outV); err != nil {
+	cal := outcome.Calibration
+	if err := outcome.Profile.Save(outV); err != nil {
 		return err
 	}
 
@@ -349,17 +348,16 @@ func cmdRetrieve(args []string) error {
 	if err != nil {
 		return err
 	}
-	rdocs := make([]retrieve.Document, len(docs))
-	for i, d := range docs {
-		rdocs[i] = retrieve.Document{Name: d.Name, Text: d.Text}
+	// Shared path with the MCP retrieve tool, so they cannot drift.
+	results, err := api.Retrieve(docs, q, api.RetrieveOptions{K: *k, MinWords: *minWords})
+	if err != nil {
+		return err
 	}
-	bank := retrieve.Build(rdocs, retrieve.Options{MinWords: *minWords})
-	results := bank.Retrieve(q, *k)
 	if len(results) == 0 {
 		fmt.Println("no relevant exemplars found.")
 		return nil
 	}
-	fmt.Printf("top %d exemplars (of %d chunks):\n", len(results), len(bank.Chunks))
+	fmt.Printf("top %d exemplars:\n", len(results))
 	for i, r := range results {
 		fmt.Printf("\n%d. [%.3f] %s #%d\n   %s\n", i+1, r.Score, r.Chunk.Source, r.Chunk.Index, oneLine(r.Chunk.Text, 240))
 	}

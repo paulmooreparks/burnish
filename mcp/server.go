@@ -53,7 +53,10 @@ profile to pass, call list_profiles and choose by register; do not guess.
 
 Tool map: list_profiles enumerates the available profiles; score is the cheap
 deterministic-only check; style_review is the full revision payload you loop on;
-distill builds a profile from a single-register corpus.`
+distill builds a profile from a single-register corpus; calibrate builds a profile
+AND derives the discriminator threshold that gives score/style_review their
+on-target verdict; retrieve returns target-style exemplar passages to ground a
+revision.`
 
 // server holds the per-instance configuration shared by the tool handlers. The
 // profiles directory is what lets a caller name a register instead of passing a
@@ -92,6 +95,20 @@ func NewServer(profilesDir string) *sdk.Server {
 		Description: "Distill a single-register corpus (a directory of .md/.txt files) into a " +
 			"style profile written to disk. Feed one genre at a time; mixing registers averages to mush.",
 	}, srv.handleDistill)
+
+	sdk.AddTool(s, &sdk.Tool{
+		Name: "calibrate",
+		Description: "Build a profile from a target corpus AND derive a calibrated discriminator threshold " +
+			"separating held-out target text from a decoy (off-style) corpus. Writes the profile to disk and " +
+			"returns the threshold, AUC, TPR/FPR, and accuracy. A calibrated profile is what makes score/style_review " +
+			"return an on-target/off-target verdict. Same corpus discipline as distill: one register.",
+	}, srv.handleCalibrate)
+
+	sdk.AddTool(s, &sdk.Tool{
+		Name: "retrieve",
+		Description: "Return the corpus passages most relevant to a query, as target-style few-shot exemplars " +
+			"to ground a revision. Reads a corpus directory and ranks chunks against the query (TF-IDF).",
+	}, srv.handleRetrieve)
 
 	sdk.AddTool(s, &sdk.Tool{
 		Name: "score",
@@ -242,6 +259,154 @@ func (s *server) handleDistill(ctx context.Context, _ *sdk.CallToolRequest, a di
 		summary += "\nwarning: " + res.Note
 	}
 	return textResult(summary, res)
+}
+
+// --- calibrate -----------------------------------------------------------
+
+type calibrateArgs struct {
+	TargetDir    string `json:"target_dir" jsonschema:"directory of target-style .md/.txt documents"`
+	DecoysDir    string `json:"decoys_dir" jsonschema:"directory of off-style (decoy) .md/.txt documents"`
+	Register     string `json:"register" jsonschema:"register/genre name"`
+	Language     string `json:"language,omitempty" jsonschema:"language code; defaults to en (only en implemented)"`
+	ID           string `json:"id,omitempty" jsonschema:"profile id; defaults to the register name"`
+	Out          string `json:"out,omitempty" jsonschema:"output profile path; defaults to <id>.profile.yaml"`
+	Avoid        string `json:"avoid,omitempty" jsonschema:"comma-separated terms this author avoids (hard violations)"`
+	Base         string `json:"base,omitempty" jsonschema:"path to a base profile to inherit (shared cross-register invariants)"`
+	HoldoutEvery int    `json:"holdout_every,omitempty" jsonschema:"hold out every Nth target doc for evaluation; defaults to 4"`
+}
+
+type calibrateResult struct {
+	ProfilePath        string  `json:"profile_path"`
+	Threshold          float64 `json:"threshold"`
+	AUC                float64 `json:"auc"`
+	TPR                float64 `json:"tpr"`
+	FPR                float64 `json:"fpr"`
+	Accuracy           float64 `json:"accuracy"`
+	TargetHoldout      int     `json:"target_holdout"`
+	Decoys             int     `json:"decoys"`
+	Train              int     `json:"train"`
+	DeterministicRules int     `json:"deterministic_rules"`
+	Separates          bool    `json:"separates"`
+	Warning            string  `json:"warning,omitempty"`
+}
+
+func (s *server) handleCalibrate(ctx context.Context, _ *sdk.CallToolRequest, a calibrateArgs) (*sdk.CallToolResult, calibrateResult, error) {
+	if a.TargetDir == "" || a.DecoysDir == "" || a.Register == "" {
+		return errResult[calibrateResult]("calibrate requires target_dir, decoys_dir, and register")
+	}
+	id := a.ID
+	if id == "" {
+		id = a.Register
+	}
+	out := a.Out
+	if out == "" {
+		out = id + ".profile.yaml"
+	}
+
+	targetDocs, err := distill.ReadCorpusDir(a.TargetDir)
+	if err != nil {
+		return errResult[calibrateResult](fmt.Sprintf("read target: %v", err))
+	}
+	decoyDocs, err := distill.ReadCorpusDir(a.DecoysDir)
+	if err != nil {
+		return errResult[calibrateResult](fmt.Sprintf("read decoys: %v", err))
+	}
+	if len(targetDocs) == 0 || len(decoyDocs) == 0 {
+		return errResult[calibrateResult](fmt.Sprintf("need .md/.txt docs in both target_dir (%d) and decoys_dir (%d)", len(targetDocs), len(decoyDocs)))
+	}
+
+	outcome, err := api.Calibrate(targetDocs, decoyDocs, api.CalibrateOptions{
+		ID:           id,
+		Register:     a.Register,
+		Language:     a.Language,
+		Avoid:        splitCSV(a.Avoid),
+		BasePath:     a.Base,
+		HoldoutEvery: a.HoldoutEvery,
+	})
+	if err != nil {
+		return errResult[calibrateResult](err.Error())
+	}
+	if err := outcome.Profile.Save(out); err != nil {
+		return errResult[calibrateResult](err.Error())
+	}
+
+	cal := outcome.Calibration
+	res := calibrateResult{
+		ProfilePath:        out,
+		Threshold:          cal.Threshold,
+		AUC:                cal.AUC,
+		TPR:                cal.TPR,
+		FPR:                cal.FPR,
+		Accuracy:           cal.Accuracy,
+		TargetHoldout:      cal.NTargetHoldout,
+		Decoys:             cal.NDecoy,
+		Train:              cal.NTrain,
+		DeterministicRules: outcome.DeterministicRules,
+		Separates:          cal.Separates,
+		Warning:            cal.Warning,
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "calibrated %s -> %s\n", id, out)
+	fmt.Fprintf(&b, "threshold %.4f (on-target if distance <= threshold), AUC %.3f\n", res.Threshold, res.AUC)
+	fmt.Fprintf(&b, "at threshold: TPR %.0f%%, FPR %.0f%%, accuracy %.0f%%\n", res.TPR*100, res.FPR*100, res.Accuracy*100)
+	fmt.Fprintf(&b, "evaluated %d held-out target vs %d decoys (%d train), %d deterministic rules",
+		res.TargetHoldout, res.Decoys, res.Train, res.DeterministicRules)
+	if !res.Separates {
+		fmt.Fprintf(&b, "\nWARNING: %s", res.Warning)
+	}
+	return textResult(b.String(), res)
+}
+
+// --- retrieve ------------------------------------------------------------
+
+type retrieveArgs struct {
+	CorpusDir string `json:"corpus_dir" jsonschema:"directory of target-style .md/.txt documents"`
+	Query     string `json:"query" jsonschema:"the query text to find exemplars for"`
+	K         int    `json:"k,omitempty" jsonschema:"number of exemplars to return; defaults to 3"`
+	MinWords  int    `json:"min_words,omitempty" jsonschema:"skip corpus chunks shorter than this; defaults to 20"`
+}
+
+type exemplar struct {
+	Score  float64 `json:"score"`
+	Source string  `json:"source"`
+	Index  int     `json:"index"`
+	Text   string  `json:"text"`
+}
+
+type retrieveResult struct {
+	Exemplars []exemplar `json:"exemplars"`
+}
+
+func (s *server) handleRetrieve(ctx context.Context, _ *sdk.CallToolRequest, a retrieveArgs) (*sdk.CallToolResult, retrieveResult, error) {
+	if a.CorpusDir == "" || strings.TrimSpace(a.Query) == "" {
+		return errResult[retrieveResult]("retrieve requires corpus_dir and a non-empty query")
+	}
+	docs, err := distill.ReadCorpusDir(a.CorpusDir)
+	if err != nil {
+		return errResult[retrieveResult](fmt.Sprintf("read corpus: %v", err))
+	}
+	if len(docs) == 0 {
+		return errResult[retrieveResult](fmt.Sprintf("no .md or .txt documents under %s", a.CorpusDir))
+	}
+
+	results, err := api.Retrieve(docs, a.Query, api.RetrieveOptions{K: a.K, MinWords: a.MinWords})
+	if err != nil {
+		return errResult[retrieveResult](err.Error())
+	}
+
+	res := retrieveResult{Exemplars: make([]exemplar, len(results))}
+	for i, r := range results {
+		res.Exemplars[i] = exemplar{Score: r.Score, Source: r.Chunk.Source, Index: r.Chunk.Index, Text: r.Chunk.Text}
+	}
+	if len(results) == 0 {
+		return textResult("no relevant exemplars found.", res)
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "top %d exemplars:\n", len(results))
+	for i, r := range results {
+		fmt.Fprintf(&b, "%d. [%.3f] %s #%d\n   %s\n", i+1, r.Score, r.Chunk.Source, r.Chunk.Index, oneLine(r.Chunk.Text, 240))
+	}
+	return textResult(strings.TrimRight(b.String(), "\n"), res)
 }
 
 // --- score ---------------------------------------------------------------
@@ -417,6 +582,17 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+// oneLine collapses whitespace and truncates s to at most n runes, for compact
+// exemplar previews in the text summary.
+func oneLine(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n]) + "..."
+	}
+	return s
 }
 
 func textResult[T any](summary string, structured T) (*sdk.CallToolResult, T, error) {
