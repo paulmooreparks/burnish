@@ -10,6 +10,7 @@ import (
 	"github.com/paulmooreparks/burnish/distill"
 	"github.com/paulmooreparks/burnish/judge"
 	"github.com/paulmooreparks/burnish/lint"
+	"github.com/paulmooreparks/burnish/pkg/api"
 	"github.com/paulmooreparks/burnish/stylespec"
 )
 
@@ -165,15 +166,20 @@ type distillArgs struct {
 	Language  string `json:"language,omitempty" jsonschema:"language code; defaults to en (only en implemented)"`
 	ID        string `json:"id,omitempty" jsonschema:"profile id; defaults to the register name"`
 	Out       string `json:"out,omitempty" jsonschema:"output profile path; defaults to <id>.profile.yaml"`
+	Avoid     string `json:"avoid,omitempty" jsonschema:"comma-separated terms this author avoids (hard violations), e.g. \"—,--\""`
+	Base      string `json:"base,omitempty" jsonschema:"path to a base profile to inherit (shared cross-register invariants)"`
+	RulesFile string `json:"rules_file,omitempty" jsonschema:"path to a YAML profile whose judged (LLM-induced) rules to merge in"`
 }
 
 type distillResult struct {
-	ProfilePath  string `json:"profile_path"`
-	Documents    int    `json:"documents"`
-	Words        int    `json:"words"`
-	Features     int    `json:"features"`
-	LexiconTerms int    `json:"lexicon_terms"`
-	Note         string `json:"note,omitempty"`
+	ProfilePath        string `json:"profile_path"`
+	Documents          int    `json:"documents"`
+	Words              int    `json:"words"`
+	Features           int    `json:"features"`
+	LexiconTerms       int    `json:"lexicon_terms"`
+	DeterministicRules int    `json:"deterministic_rules"`
+	JudgedRules        int    `json:"judged_rules"`
+	Note               string `json:"note,omitempty"`
 }
 
 func (s *server) handleDistill(ctx context.Context, _ *sdk.CallToolRequest, a distillArgs) (*sdk.CallToolResult, distillResult, error) {
@@ -197,26 +203,41 @@ func (s *server) handleDistill(ctx context.Context, _ *sdk.CallToolRequest, a di
 		return errResult[distillResult](fmt.Sprintf("no .md or .txt documents under %s", a.CorpusDir))
 	}
 
-	prof, err := distill.Distill(id, a.Register, a.Language, docs, distill.DefaultOptions())
+	// Shared distill-and-finish path: same mining, base inheritance, and judged-
+	// rule merge as the CLI, so the MCP profile is never a weaker one.
+	outcome, err := api.Distill(docs, api.DistillOptions{
+		ID:        id,
+		Register:  a.Register,
+		Language:  a.Language,
+		Avoid:     splitCSV(a.Avoid),
+		BasePath:  a.Base,
+		RulesFile: a.RulesFile,
+	})
 	if err != nil {
 		return errResult[distillResult](err.Error())
 	}
+	prof := outcome.Profile
 	if err := prof.Save(out); err != nil {
 		return errResult[distillResult](err.Error())
 	}
 
 	res := distillResult{
-		ProfilePath:  out,
-		Documents:    prof.Corpus.Documents,
-		Words:        prof.Corpus.Words,
-		Features:     len(prof.Features),
-		LexiconTerms: len(prof.Lexicon.Preferred),
+		ProfilePath:        out,
+		Documents:          prof.Corpus.Documents,
+		Words:              prof.Corpus.Words,
+		Features:           len(prof.Features),
+		LexiconTerms:       len(prof.Lexicon.Preferred),
+		DeterministicRules: outcome.DeterministicRules,
+		JudgedRules:        outcome.JudgedRules,
 	}
 	if prof.Corpus.Documents < 5 {
 		res.Note = fmt.Sprintf("thin corpus (%d docs); target ranges are low-confidence", prof.Corpus.Documents)
 	}
-	summary := fmt.Sprintf("distilled %d documents (%d words) -> %s\n%d features, %d preferred lexicon terms",
-		res.Documents, res.Words, res.ProfilePath, res.Features, res.LexiconTerms)
+	summary := fmt.Sprintf("distilled %d documents (%d words) -> %s\n%d features, %d preferred lexicon terms, %d deterministic rules, %d judged rules",
+		res.Documents, res.Words, res.ProfilePath, res.Features, res.LexiconTerms, res.DeterministicRules, res.JudgedRules)
+	if len(outcome.SkippedJudged) > 0 {
+		summary += fmt.Sprintf("\nnote: skipped %d judged rule(s) on id collision: %s", len(outcome.SkippedJudged), strings.Join(outcome.SkippedJudged, ", "))
+	}
 	if res.Note != "" {
 		summary += "\nwarning: " + res.Note
 	}
@@ -385,6 +406,17 @@ func reviewSummary(p *stylespec.Profile, res lint.Result) string {
 	s += "\njudgement: deterministic checks and the discriminator verdict are above; render the subjective" +
 		" judged-rule verdict yourself in a fresh, isolated context."
 	return s
+}
+
+// splitCSV splits a comma-separated value into trimmed, non-empty terms.
+func splitCSV(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func textResult[T any](summary string, structured T) (*sdk.CallToolResult, T, error) {

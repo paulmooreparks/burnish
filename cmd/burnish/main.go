@@ -24,6 +24,7 @@ import (
 	"github.com/paulmooreparks/burnish/lint"
 	bpmcp "github.com/paulmooreparks/burnish/mcp"
 	"github.com/paulmooreparks/burnish/model"
+	"github.com/paulmooreparks/burnish/pkg/api"
 	"github.com/paulmooreparks/burnish/retrieve"
 	"github.com/paulmooreparks/burnish/serve"
 	"github.com/paulmooreparks/burnish/stylespec"
@@ -170,47 +171,28 @@ func cmdDistill(args []string) error {
 		return fmt.Errorf("no .md or .txt documents under %s", corpusV)
 	}
 
-	opts := distill.DefaultOptions()
-	opts.Avoid = splitCSV(*avoid)
-	prof, err := distill.Distill(idV, registerV, *language, docs, opts)
+	// Shared distill-and-finish path (mining, base inheritance, judged-rule merge),
+	// identical to the MCP tool so the two front ends cannot drift.
+	outcome, err := api.Distill(docs, api.DistillOptions{
+		ID:        idV,
+		Register:  registerV,
+		Language:  *language,
+		Avoid:     splitCSV(*avoid),
+		BasePath:  *base,
+		RulesFile: *rulesFile,
+	})
 	if err != nil {
 		return err
 	}
-	prof.Rules = judge.Mine(docs, judge.DefaultMinSupport)
-	// Resolve inheritance after the deterministic rules are set, so the saved
-	// profile carries the author's base invariants and matches Load.
-	prof.Inherits = *base
-	if prof, err = stylespec.Resolve(prof, ""); err != nil {
-		return err
-	}
-	// Merge author-induced judged (subjective) rules AFTER Resolve, so the base
-	// merge cannot clobber them, deduped by id so they never collide with a mined
-	// or base rule. Load the carrier file raw (ignore any stray inherits).
-	nJudged := 0
-	if *rulesFile != "" {
-		rf, err := stylespec.LoadRaw(*rulesFile)
-		if err != nil {
-			return fmt.Errorf("rules-file: %w", err)
-		}
-		have := map[string]bool{}
-		for _, r := range prof.Rules {
-			have[r.ID] = true
-		}
-		for _, r := range judge.JudgedRules(rf.Rules) {
-			if have[r.ID] {
-				fmt.Fprintf(os.Stderr, "  warning: judged rule %q collides with an existing rule id; skipped\n", r.ID)
-				continue
-			}
-			have[r.ID] = true
-			prof.Rules = append(prof.Rules, r)
-			nJudged++
-		}
+	prof := outcome.Profile
+	for _, skipped := range outcome.SkippedJudged {
+		fmt.Fprintf(os.Stderr, "  warning: judged rule %q collides with an existing rule id; skipped\n", skipped)
 	}
 	if err := prof.Save(outV); err != nil {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "distilled %d documents (%d words) -> %s\n", prof.Corpus.Documents, prof.Corpus.Words, outV)
-	fmt.Fprintf(os.Stderr, "  %d features, %d preferred lexicon terms, %d deterministic rules, %d judged rules\n", len(prof.Features), len(prof.Lexicon.Preferred), len(prof.Rules)-nJudged, nJudged)
+	fmt.Fprintf(os.Stderr, "  %d features, %d preferred lexicon terms, %d deterministic rules, %d judged rules\n", len(prof.Features), len(prof.Lexicon.Preferred), outcome.DeterministicRules, outcome.JudgedRules)
 	if prof.Corpus.Documents < 5 {
 		fmt.Fprintf(os.Stderr, "  warning: thin corpus (%d docs); target ranges are low-confidence\n", prof.Corpus.Documents)
 	}
