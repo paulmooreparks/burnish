@@ -275,9 +275,13 @@ func TestDistillScoreReviewRoundTrip(t *testing.T) {
 	cs := connect(t)
 
 	// distill
+	// Configure the em-dash as an avoided term, the opt-in channel for a hard
+	// invariant. burnish bakes no implicit hard gate from a feature being absent
+	// in the corpus (burnish-23), so the hard violation must come from --avoid.
 	dres, dtext := callText(t, cs, "distill", map[string]any{
 		"corpus_dir": corpus,
 		"register":   "test-register",
+		"avoid":      "—,--",
 		"out":        profile,
 	})
 	if dres.IsError {
@@ -290,7 +294,8 @@ func TestDistillScoreReviewRoundTrip(t *testing.T) {
 		t.Errorf("unexpected distill summary: %s", dtext)
 	}
 
-	// score a draft full of em-dashes and hedging (off-style); expect hard violation.
+	// score a draft full of em-dashes and hedging (off-style); expect a hard
+	// violation from the avoided em-dash.
 	sres, stext := callText(t, cs, "score", map[string]any{
 		"profile_path": profile,
 		"text":         "Perhaps, generally speaking, this might possibly be a rather long and meandering sentence — one that goes on and on.",

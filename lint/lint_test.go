@@ -36,6 +36,40 @@ func TestScaleForNonRateUnaffected(t *testing.T) {
 	}
 }
 
+// TestZeroRateFeatureIsSoftAndBounded is the burnish-23 regression: a feature
+// absent across the corpus (paren_rate mean=std=0, target [0,0]) must NOT make a
+// draft containing that feature a hard violation, and its soft deviation must be
+// bounded (about one unit per occurrence), not a near-infinite outlier.
+func TestZeroRateFeatureIsSoftAndBounded(t *testing.T) {
+	p := &stylespec.Profile{
+		Language: "en",
+		Corpus:   stylespec.CorpusStats{Documents: 12, Words: 12000},
+		Features: []stylespec.Feature{
+			{ID: "paren_rate", Mean: 0, Stddev: 0, Weight: 1,
+				Target: stylespec.Target{Min: stylespec.Ptr(0.0), Max: stylespec.Ptr(0.0)}},
+		},
+	}
+	// A normal sentence with one parenthetical, ~12 words.
+	draft := "The release ships today (after review) and the team is ready."
+	res, err := Check(draft, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.HardViolations != 0 {
+		t.Errorf("a zero-rate feature must not hard-fail a draft, got %d hard violations", res.HardViolations)
+	}
+	if len(res.Features) != 1 {
+		t.Fatalf("expected the paren_rate feature to register one (soft) violation, got %d", len(res.Features))
+	}
+	if res.Features[0].Severity != "soft" {
+		t.Errorf("feature severity = %q, want soft", res.Features[0].Severity)
+	}
+	// One occurrence should be a small handful of units, not dozens.
+	if d := res.Features[0].Deviation; d > 3 {
+		t.Errorf("single-occurrence deviation = %.1f, want bounded (<= 3)", d)
+	}
+}
+
 func TestCheckShortDraftDampensSingleToken(t *testing.T) {
 	// A profile where "fw.an" is rare (mean 4) with modest spread; a long corpus.
 	p := &stylespec.Profile{

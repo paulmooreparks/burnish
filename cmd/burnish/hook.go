@@ -144,11 +144,6 @@ func hardViolationReason(res lint.Result) string {
 		b.WriteString("Avoided terms present: " + strings.Join(terms, ", ") +
 			". Remove them (no em-dashes or the '--' stand-in; use commas, colons, or parentheses). ")
 	}
-	for _, f := range res.Features {
-		if f.Severity == "hard" {
-			b.WriteString(fmt.Sprintf("Feature %s is outside its hard range (%.3g). ", f.ID, f.Value))
-		}
-	}
 	b.WriteString("Rewrite the response so it satisfies the style's hard invariants.")
 	return b.String()
 }

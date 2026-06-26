@@ -89,19 +89,20 @@ func Check(draft string, p *stylespec.Profile) (Result, error) {
 			continue
 		}
 		weightedSum += f.Weight * dev
-		fv := FeatureViolation{
+		// Feature breaches are always SOFT: they measure distance from the corpus
+		// distribution, not a gate. Hard invariants are opt-in and come only from the
+		// avoided lexicon (below) and the deterministic rule layer (judge). A feature
+		// that merely happened to be absent in the corpus must not become a hard
+		// "must be zero" rule (burnish-23).
+		res.Features = append(res.Features, FeatureViolation{
 			ID:        f.ID,
 			Value:     num.Round(v, 4),
 			Min:       f.Target.Min,
 			Max:       f.Target.Max,
 			Deviation: num.Round(dev, 3),
 			Weight:    f.Weight,
-			Severity:  severity(f, v),
-		}
-		if fv.Severity == "hard" {
-			res.HardViolations++
-		}
-		res.Features = append(res.Features, fv)
+			Severity:  "soft",
+		})
 	}
 	if weightTotal > 0 {
 		res.Distance = num.Round(weightedSum/weightTotal, 4)
@@ -149,12 +150,22 @@ func scaleFor(f stylespec.Feature, nWords int, corpusDocWords float64) float64 {
 	if extra < 0 {
 		extra = 0
 	}
-	return math.Sqrt(f.Stddev*f.Stddev + extra)
+	s := math.Sqrt(f.Stddev*f.Stddev + extra)
+	// Floor the scale at the rate of a single occurrence in the draft (1000/nWords
+	// per 1k). A feature absent from the corpus (mean=std=0, e.g. a punctuation the
+	// author happened not to use) would otherwise give a ~0 scale, so a lone
+	// occurrence reads as a near-infinite outlier. The floor makes each occurrence
+	// worth about one unit of deviation: a bounded soft signal that still rises with
+	// frequency, rather than a hard or 84-sigma failure on the first one (burnish-23).
+	if floor := 1000.0 / float64(nWords); s < floor {
+		s = floor
+	}
+	return s
 }
 
 // deviation returns how far value lies outside the target range, measured in
 // scale units. Returns 0 when in range. A near-zero scale falls back to epsilon
-// so hard invariants (max 0) still register.
+// only as a divide-by-zero guard (scaleFor floors per-1k rates well above it).
 func deviation(value float64, t stylespec.Target, scale float64) float64 {
 	if scale < epsilon {
 		scale = epsilon
@@ -166,16 +177,6 @@ func deviation(value float64, t stylespec.Target, scale float64) float64 {
 		return (value - *t.Max) / scale
 	}
 	return 0
-}
-
-// severity classifies a feature violation. A feature whose target caps at zero
-// (the em-dash invariant, and any future hard zero) is a hard violation when
-// breached; everything else is soft.
-func severity(f stylespec.Feature, value float64) string {
-	if f.Target.Max != nil && *f.Target.Max == 0 && value > 0 {
-		return "hard"
-	}
-	return "soft"
 }
 
 func findAvoided(draft string, avoided []string) []LexicalViolation {
